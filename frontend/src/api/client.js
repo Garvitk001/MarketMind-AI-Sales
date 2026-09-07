@@ -1,7 +1,19 @@
-const defaultHost = typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : '127.0.0.1';
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `http://${defaultHost}:8000/api/v1`;
+const normalizeBaseUrl = (url) => {
+  if (!url) return '';
+  let cleaned = url.trim().replace(/\/+$/, '');
+  if (!cleaned.endsWith('/api/v1')) {
+    cleaned = `${cleaned}/api/v1`;
+  }
+  return cleaned;
+};
 
-export const resolveApiAsset = (path) => path ? `${API_BASE_URL}${path}` : null;
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const defaultHost = typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : '127.0.0.1';
+export const API_BASE_URL = rawBaseUrl 
+  ? normalizeBaseUrl(rawBaseUrl) 
+  : `http://${defaultHost}:8000/api/v1`;
+
+export const resolveApiAsset = (path) => path ? `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}` : null;
 
 export class ApiError extends Error {
   constructor(message, status) {
