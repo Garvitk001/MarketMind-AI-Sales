@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Any
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,7 +34,7 @@ class Settings(BaseSettings):
     rate_limit_authenticated_per_minute: int = 300
     auth_backoff_base_seconds: int = 2
     auth_backoff_max_seconds: int = 300
-    cors_origins: list[str] = Field(
+    cors_origins: list[str] | str = Field(
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
@@ -63,12 +64,23 @@ class Settings(BaseSettings):
 
     @field_validator("cors_origins", mode="before")
     @classmethod
-    def parse_cors_origins(cls, value: list[str] | str) -> list[str]:
+    def parse_cors_origins(cls, value: Any) -> list[str]:
         if isinstance(value, str):
-            if value.strip() == "*":
+            value = value.strip()
+            if value.startswith("[") and value.endswith("]"):
+                try:
+                    import json
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        return [str(x).strip() for x in parsed if str(x).strip()]
+                except Exception:
+                    pass
+            if value == "*":
                 return ["*"]
             return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
+        if isinstance(value, (list, tuple, set)):
+            return [str(origin).strip() for origin in value if str(origin).strip()]
+        return ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     @field_validator("jwt_secret")
     @classmethod
