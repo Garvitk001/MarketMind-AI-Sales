@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { MOCK_OWNER_DATA } from '../../data/mockData';
 import { Card, CardHeader, CardTitle, CardDescription } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { DateRangeFilter } from '../common/DateRangeFilter';
 import {
@@ -13,6 +15,7 @@ import {
   CreditCard,
   Sparkles,
   ArrowUpRight,
+  ArrowDownRight,
   Zap,
   Download,
   Printer,
@@ -20,7 +23,18 @@ import {
   Send,
   AlertTriangle,
   Clock,
-  ShieldCheck
+  ShieldCheck,
+  Calendar,
+  Search,
+  UserCheck,
+  Target,
+  Award,
+  Eye,
+  TrendingUp,
+  LayoutGrid,
+  List,
+  Store,
+  ShoppingBag
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -37,9 +51,83 @@ import {
   Bar
 } from 'recharts';
 
+const getTimeRangeDates = (range) => {
+  const now = new Date();
+  const formatIso = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  if (range === 'today') {
+    return { from: formatIso(now), to: formatIso(now), label: 'Today' };
+  }
+  if (range === 'yesterday') {
+    const yest = new Date(now);
+    yest.setDate(yest.getDate() - 1);
+    return { from: formatIso(yest), to: formatIso(yest), label: 'Yesterday' };
+  }
+  if (range === '7_days') {
+    const d7 = new Date(now);
+    d7.setDate(d7.getDate() - 6);
+    return { from: formatIso(d7), to: formatIso(now), label: 'Last 7 Days' };
+  }
+  if (range === '30_days') {
+    const d30 = new Date(now);
+    d30.setDate(d30.getDate() - 29);
+    return { from: formatIso(d30), to: formatIso(now), label: 'Last 30 Days' };
+  }
+  if (range === '6_months') {
+    const d180 = new Date(now);
+    d180.setDate(d180.getDate() - 180);
+    return { from: formatIso(d180), to: formatIso(now), label: 'Last 6 Months (180 Days)' };
+  }
+  return { from: formatIso(now), to: formatIso(now), label: 'Custom Period' };
+};
+
 export const OwnerDashboard = ({ onNavigate }) => {
   const { salesDashboard, customerSummary } = useData();
+  const { api } = useAuth();
   const { t } = useLanguage();
+
+  const [execTimeframe, setExecTimeframe] = useState('7_days');
+  const [teamData, setTeamData] = useState(null);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+  const [execSearch, setExecSearch] = useState('');
+  const [selectedExec, setSelectedExec] = useState(null);
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
+
+  useEffect(() => {
+    const dates = getTimeRangeDates(execTimeframe);
+    setLoadingTeam(true);
+    api(`/team/overview?date_from=${dates.from}&date_to=${dates.to}`)
+      .then((res) => {
+        setTeamData(res);
+      })
+      .catch((err) => {
+        console.error('Failed to load team performance overview:', err);
+      })
+      .finally(() => {
+        setLoadingTeam(false);
+      });
+  }, [api, execTimeframe]);
+
+  const salesExecList = useMemo(() => {
+    const list = teamData?.employees || [];
+    return list.filter((emp) => emp.role_code === 'sales_executive' || emp.role_code === 'store_manager');
+  }, [teamData]);
+
+  const filteredSalesExecs = useMemo(() => {
+    if (!execSearch.trim()) return salesExecList;
+    const q = execSearch.toLowerCase();
+    return salesExecList.filter(
+      (e) =>
+        e.full_name?.toLowerCase().includes(q) ||
+        e.email?.toLowerCase().includes(q) ||
+        e.store_name?.toLowerCase().includes(q)
+    );
+  }, [salesExecList, execSearch]);
   const {
     kpis: mockKpis,
     categoryDistribution,
@@ -310,6 +398,435 @@ export const OwnerDashboard = ({ onNavigate }) => {
           </div>
         </Card>
       </div>
+
+      {/* Individual Sales Executive Sales & Real-Time Performance Section */}
+      <Card className="border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-[#0f1422] shadow-xl">
+        <CardHeader>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between w-full gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-500/20">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <span>Individual Sales Executive Sales Telemetry</span>
+                    <Badge variant="info">Live Staff Telemetry</Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Real-time individual employee sales revenue, closed orders, and target progress across custom periods.
+                  </CardDescription>
+                </div>
+              </div>
+            </div>
+
+            {/* Timeframe Selector & View Mode Buttons */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Period Selectors */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                {[
+                  { id: 'today', label: 'Today' },
+                  { id: 'yesterday', label: 'Yesterday' },
+                  { id: '7_days', label: '7 Days' },
+                  { id: '30_days', label: '30 Days' },
+                  { id: '6_months', label: '6 Months' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setExecTimeframe(tab.id)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      execTimeframe === tab.id
+                        ? 'bg-indigo-600 text-white shadow-md'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative w-full sm:w-44">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search executive..."
+                  value={execSearch}
+                  onChange={(e) => setExecSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                />
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={`p-1.5 rounded-lg transition ${
+                    viewMode === 'cards' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow' : 'text-slate-400'
+                  }`}
+                  title="Grid Cards View"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`p-1.5 rounded-lg transition ${
+                    viewMode === 'table' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow' : 'text-slate-400'
+                  }`}
+                  title="Table Comparison View"
+                >
+                  <List className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+
+        {/* Sales Executives Display */}
+        {loadingTeam ? (
+          <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+            <span className="w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+            <span>Loading individual sales telemetry for {getTimeRangeDates(execTimeframe).label}...</span>
+          </div>
+        ) : filteredSalesExecs.length === 0 ? (
+          <div className="p-8 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-500 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center mx-auto">
+              <Users className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-900 dark:text-slate-100">No Sales Executives Found</p>
+              <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                Add sales executives and staff to your business to track their individual sales, invoice receipts, and commission targets.
+              </p>
+            </div>
+            <Button size="sm" variant="primary" icon={ArrowUpRight} onClick={() => onNavigate('team')}>
+              Add Sales Executives in Team Tab
+            </Button>
+          </div>
+        ) : viewMode === 'cards' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
+            {filteredSalesExecs.map((exec) => {
+              const rev = Number(exec.metrics?.revenue || 0);
+              const txCount = exec.metrics?.transactions || 0;
+              const itemsSold = exec.metrics?.items_sold || 0;
+              const aov = exec.metrics?.average_order_value ? Number(exec.metrics.average_order_value) : 0;
+              const targetVal = exec.target?.target_value ? Number(exec.target.target_value) : null;
+              const completion = exec.target?.completion_percentage ?? (targetVal ? Math.min(100, Math.round((rev / targetVal) * 100)) : null);
+              const growth = exec.metrics?.revenue_change_percentage;
+
+              return (
+                <div
+                  key={exec.employee_id}
+                  className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-850 dark:bg-[#121826] p-4 shadow-sm hover:border-indigo-400 dark:hover:border-indigo-600 transition-all flex flex-col justify-between gap-4 group"
+                >
+                  {/* Top info */}
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-lg shrink-0">
+                          {exec.avatar_emoji || '👨‍💼'}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate group-hover:text-indigo-400 transition-colors">
+                            {exec.full_name}
+                          </h4>
+                          <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
+                            <Store className="w-3 h-3 text-indigo-400 shrink-0" />
+                            <span>{exec.store_name || 'Main Enterprise Store'}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <Badge
+                        variant={
+                          exec.performance_level === 'excellent'
+                            ? 'success'
+                            : exec.performance_level === 'on_track'
+                            ? 'info'
+                            : exec.performance_level === 'needs_attention'
+                            ? 'warning'
+                            : 'neutral'
+                        }
+                        size="sm"
+                      >
+                        {exec.performance_level === 'excellent'
+                          ? '⭐ Top Performer'
+                          : exec.performance_level === 'on_track'
+                          ? 'On Track'
+                          : exec.performance_level === 'needs_attention'
+                          ? 'Needs Attention'
+                          : 'Active Rep'}
+                      </Badge>
+                    </div>
+
+                    {/* Sales Metrics Grid */}
+                    <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800/80">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Period Sales</span>
+                        <p className="text-base font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                          {money(rev)}
+                        </p>
+                        {growth !== null && growth !== undefined && (
+                          <span
+                            className={`inline-flex items-center text-[10px] font-bold ${
+                              growth >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                            }`}
+                          >
+                            {growth >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                            {Math.abs(growth)}% vs prev
+                          </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Orders Closed</span>
+                        <p className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">
+                          {txCount} <span className="text-xs font-normal text-slate-400">invoices</span>
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {itemsSold} units · AOV {money(aov)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Target Progress Bar */}
+                    {targetVal ? (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                            <Target className="w-3 h-3 text-indigo-400" />
+                            Target: {money(targetVal)}
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-slate-100">
+                            {completion}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              completion >= 100
+                                ? 'bg-emerald-500'
+                                : completion >= 80
+                                ? 'bg-indigo-500'
+                                : 'bg-amber-500'
+                            }`}
+                            style={{ width: `${Math.min(100, completion)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-400 flex items-center justify-between">
+                        <span>Assigned Target: Standard Sales Quota</span>
+                        <span className="text-indigo-400 font-semibold">{txCount} Closed Deals</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Footer */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400">
+                      Period: <strong>{getTimeRangeDates(execTimeframe).label}</strong>
+                    </span>
+                    <button
+                      onClick={() => setSelectedExec(exec)}
+                      className="text-xs text-indigo-500 hover:text-indigo-400 font-bold flex items-center gap-1 group-hover:underline"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Inspect History
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* Table Comparison View */
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="uppercase text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+                <tr>
+                  <th className="p-3">Sales Executive</th>
+                  <th className="p-3">Assigned Store</th>
+                  <th className="p-3">Period Sales Revenue</th>
+                  <th className="p-3">Closed Orders</th>
+                  <th className="p-3">Items Sold</th>
+                  <th className="p-3">Avg Ticket (AOV)</th>
+                  <th className="p-3">Target Completion</th>
+                  <th className="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {filteredSalesExecs.map((exec) => {
+                  const rev = Number(exec.metrics?.revenue || 0);
+                  const txCount = exec.metrics?.transactions || 0;
+                  const itemsSold = exec.metrics?.items_sold || 0;
+                  const aov = exec.metrics?.average_order_value ? Number(exec.metrics.average_order_value) : 0;
+                  const targetVal = exec.target?.target_value ? Number(exec.target.target_value) : null;
+                  const completion = exec.target?.completion_percentage ?? (targetVal ? Math.min(100, Math.round((rev / targetVal) * 100)) : null);
+
+                  return (
+                    <tr key={exec.employee_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{exec.avatar_emoji || '👨‍💼'}</span>
+                          <div>
+                            <p className="font-bold text-slate-900 dark:text-slate-100">{exec.full_name}</p>
+                            <p className="text-[10px] text-slate-400">{exec.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-slate-600 dark:text-slate-300 font-medium">
+                        {exec.store_name || 'Main Enterprise Store'}
+                      </td>
+                      <td className="p-3">
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">
+                          {money(rev)}
+                        </span>
+                      </td>
+                      <td className="p-3 font-semibold text-slate-900 dark:text-slate-100">
+                        {txCount} orders
+                      </td>
+                      <td className="p-3 text-slate-600 dark:text-slate-300">
+                        {itemsSold} units
+                      </td>
+                      <td className="p-3 text-slate-600 dark:text-slate-300 font-mono">
+                        {money(aov)}
+                      </td>
+                      <td className="p-3">
+                        {targetVal ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${completion >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                                style={{ width: `${Math.min(100, completion)}%` }}
+                              />
+                            </div>
+                            <span className="font-bold text-[11px]">{completion}%</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">—</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={Eye}
+                          onClick={() => setSelectedExec(exec)}
+                          className="text-xs"
+                        >
+                          Inspect
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Individual Sales Executive Breakdown Modal */}
+      <Modal
+        isOpen={Boolean(selectedExec)}
+        onClose={() => setSelectedExec(null)}
+        title={`Sales Performance: ${selectedExec?.full_name || ''}`}
+        maxWidth="max-w-2xl"
+      >
+        {selectedExec && (
+          <div className="space-y-5 text-slate-200">
+            {/* Executive Header Card */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-950 via-slate-900 to-violet-950 border border-indigo-800/40 flex items-center justify-between gap-3 text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl">
+                  {selectedExec.avatar_emoji || '👨‍💼'}
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">{selectedExec.full_name}</h3>
+                  <p className="text-xs text-indigo-200">{selectedExec.email} · {selectedExec.store_name || 'Store Operations'}</p>
+                </div>
+              </div>
+              <Badge variant="info">Period: {getTimeRangeDates(execTimeframe).label}</Badge>
+            </div>
+
+            {/* Metric KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Period Revenue</span>
+                <p className="text-lg font-bold text-indigo-500 mt-1">
+                  {money(selectedExec.metrics?.revenue || 0)}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Orders</span>
+                <p className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+                  {selectedExec.metrics?.transactions || 0} Invoices
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Items Sold</span>
+                <p className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+                  {selectedExec.metrics?.items_sold || 0} Units
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Average Ticket</span>
+                <p className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+                  {money(selectedExec.metrics?.average_order_value || 0)}
+                </p>
+              </div>
+            </div>
+
+            {/* Daily Trend Chart if available */}
+            {selectedExec.trend && selectedExec.trend.length > 0 && (
+              <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                <div className="flex justify-between items-center text-xs font-bold text-slate-900 dark:text-slate-100">
+                  <span>Daily Sales Revenue Breakdown</span>
+                  <span className="text-slate-400">Last recorded activity</span>
+                </div>
+                <div className="h-40 w-full pt-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={selectedExec.trend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} />
+                      <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} />
+                      <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={(v) => `₹${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', color: '#fff' }}
+                        formatter={(v) => [money(v), 'Revenue']}
+                      />
+                      <Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* AI Insights & Observations */}
+            {selectedExec.insights && selectedExec.insights.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-xs space-y-1.5">
+                <span className="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" /> Performance Observations
+                </span>
+                <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300">
+                  {selectedExec.insights.map((insight, idx) => (
+                    <li key={idx}>{insight}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-800">
+              <Button variant="outline" onClick={() => setSelectedExec(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Category Share & Strategic AI Engine */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
