@@ -507,7 +507,7 @@ def seed_business_sample(db: Session, *, tenant_id: UUID, store_id: UUID, seller
                     source_system="sample_data",
                     external_customer_id=identifier,
                     company_name=f"{company_info[0]} #{index+1}",
-                    gstin=f"GSTIN-{index+1:02d}-{company_info[1]}",
+                    gstin=company_info[1],
                     contact_phone=f"+91 98765 {10000 + index * 411}",
                     contact_email=f"accounts.client{index+1}@wholesaler.com",
                     credit_terms=company_info[2],

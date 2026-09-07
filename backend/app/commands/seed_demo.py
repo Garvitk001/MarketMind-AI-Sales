@@ -32,6 +32,18 @@ def main() -> None:
     args = parse_args()
     # Create all database tables if they do not exist yet (e.g. fresh PostgreSQL instance)
     Base.metadata.create_all(bind=engine)
+    # Safely ensure column widths on PostgreSQL if tables existed from earlier run
+    try:
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            if engine.dialect.name == "postgresql":
+                conn.execute(text("ALTER TABLE customers ALTER COLUMN gstin TYPE VARCHAR(60);"))
+                conn.execute(text("ALTER TABLE customers ALTER COLUMN company_name TYPE VARCHAR(255);"))
+                conn.execute(text("ALTER TABLE customers ALTER COLUMN contact_phone TYPE VARCHAR(50);"))
+                conn.execute(text("ALTER TABLE customers ALTER COLUMN contact_email TYPE VARCHAR(150);"))
+                conn.execute(text("ALTER TABLE sales_transactions ALTER COLUMN payment_method TYPE VARCHAR(60);"))
+    except Exception:
+        pass
     with SessionLocal() as db:
         seed_authorization(db)
         tenant = db.scalar(select(Tenant).where(Tenant.slug == args.tenant))
