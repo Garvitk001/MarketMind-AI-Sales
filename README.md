@@ -1,6 +1,27 @@
 # 🚀 MarketMind AI — Enterprise Sales Intelligence & Business Copilot Platform
 
+[![Live Frontend App](https://img.shields.io/badge/Live%20Frontend-Vercel%20Application-success?style=for-the-badge&logo=vercel)](https://marketmind-ai-sales.vercel.app)
+[![Backend API Docs](https://img.shields.io/badge/Backend%20API-Render%20Swagger-blue?style=for-the-badge&logo=fastapi)](https://marketmind-backend.onrender.com/api/v1/docs)
+
 > **MarketMind AI (v2.5)** is a full-stack, enterprise-grade AI sales intelligence, customer retention, inventory management, demand forecasting, and conversational business copilot platform engineered specifically for small and medium retail/wholesale enterprises.
+
+---
+
+## 🌐 Live Deployments & Application Links
+
+| Component | Platform | Direct Live Link |
+| :--- | :--- | :--- |
+| **Frontend Web Application** | **Vercel** | 🔗 **[https://marketmind-ai-sales.vercel.app](https://marketmind-ai-sales.vercel.app)** |
+| **Backend REST API** | **Render** | ⚙️ **[https://marketmind-backend.onrender.com/api/v1](https://marketmind-backend.onrender.com/api/v1)** |
+| **Interactive API Documentation** | **Swagger UI** | 📚 **[https://marketmind-backend.onrender.com/api/v1/docs](https://marketmind-backend.onrender.com/api/v1/docs)** |
+
+---
+
+## 👤 About the Project & Developer
+- **Project**: MarketMind AI — Small Business Sales Intelligence & AI Copilot
+- **Author**: Garvit ([@Garvitk001](https://github.com/Garvitk001))
+- **Live Frontend App**: [https://marketmind-ai-sales.vercel.app](https://marketmind-ai-sales.vercel.app)
+- **Repository**: [Team_1_Small_Biz_Sales_AI](https://github.com/springboardmentor24052s-tech/Team_1_Small_Biz_Sales_AI)
 
 ---
 

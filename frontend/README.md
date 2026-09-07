@@ -1,5 +1,9 @@
 # MarketMind AI — Frontend Application
 
+[![Live Application](https://img.shields.io/badge/Live%20Frontend-Vercel%20Application-success?style=for-the-badge&logo=vercel)](https://marketmind-ai-sales.vercel.app)
+
+> **Live Production App**: [https://marketmind-ai-sales.vercel.app](https://marketmind-ai-sales.vercel.app)
+
 Modern React & Vite single-page application (SPA) providing role-aware executive dashboards, point-of-sale interfaces, customer analytics, AI recommendation views, anomaly alerts, and an interactive bilingual AI Business Copilot.
 
 ---
