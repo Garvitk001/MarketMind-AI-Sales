@@ -341,12 +341,16 @@ export const BusinessSetupModule = ({ onNavigate }) => {
             <Button className="w-full" variant="secondary" icon={Users} onClick={() => onNavigate && onNavigate('team')}>
               Invite Team Members
             </Button>
-            <Button className="w-full" variant="outline" icon={WandSparkles} onClick={addSampleData}>
-              Seed Sample Business Data
-            </Button>
-            <p className="text-xs leading-relaxed text-slate-500">
-              Sample data populates products, inventory, customers, and sales transactions isolated to this workspace.
-            </p>
+            {(profile?.tenant_slug === 'hello' || profile?.email?.toLowerCase().includes('demo')) && (
+              <>
+                <Button className="w-full" variant="outline" icon={WandSparkles} onClick={addSampleData}>
+                  Seed Sample Business Data
+                </Button>
+                <p className="text-xs leading-relaxed text-slate-500">
+                  Sample data populates products, inventory, customers, and sales transactions isolated to this demo workspace.
+                </p>
+              </>
+            )}
           </div>
         </Card>
       </div>

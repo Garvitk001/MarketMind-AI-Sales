@@ -50,46 +50,59 @@ export const OwnerDashboard = ({ onNavigate }) => {
   const money = (value) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency }).format(Number(value || 0));
 
+  const totalRev = salesDashboard?.revenue?.value ?? 0;
+  const totalOrd = salesDashboard?.transaction_count?.value ?? 0;
+  const totalCust = customerSummary?.customer_count ?? 0;
+  const outstandingCredit = Number(salesDashboard?.outstanding_credit ?? customerSummary?.outstanding_receivables ?? 0);
+
+  const hasBusinessData = Boolean(
+    totalRev > 0 || totalOrd > 0 || totalCust > 0 || (salesDashboard?.trend || []).length > 0
+  );
+
   const kpis = {
     totalRevenue: {
       label: t('Total Net Revenue'),
-      value: salesDashboard?.revenue?.value != null ? money(salesDashboard.revenue.value) : money(1485000),
-      change: '+14.2%',
+      value: money(totalRev),
+      change: hasBusinessData ? '+14.2%' : '0%',
       timeFrame: 'selected period'
     },
     totalOrders: {
       label: t('B2B Orders Processed'),
-      value: salesDashboard?.transaction_count?.value != null ? `${salesDashboard.transaction_count.value} Orders` : '45 Orders',
-      change: '+8.5%',
+      value: `${totalOrd} Orders`,
+      change: hasBusinessData ? '+8.5%' : '0%',
       timeFrame: 'selected period'
     },
     totalCustomers: {
       label: t('Active Client Accounts'),
-      value: customerSummary?.customer_count != null ? `${customerSummary.customer_count} Clients` : '24 Clients',
-      change: '+12.0%',
+      value: `${totalCust} Clients`,
+      change: hasBusinessData ? '+12.0%' : '0%',
       timeFrame: 'active buyers'
     },
     outstandingCredit: {
       label: t('Outstanding Credit Receivables'),
-      value: money(146500),
-      change: '5 Overdue Invoices',
+      value: money(outstandingCredit),
+      change: outstandingCredit > 0 ? 'Active Credit Terms' : '0 Overdue Invoices',
       timeFrame: 'Net 30 terms'
     }
   };
 
   const revenueTrend = (salesDashboard?.trend || []).length
     ? salesDashboard.trend.map((point) => ({ name: point.date, revenue: point.revenue }))
-    : MOCK_OWNER_DATA.revenueTrend;
+    : hasBusinessData
+      ? MOCK_OWNER_DATA.revenueTrend
+      : [];
 
-  const hasBusinessData = Boolean(
-    (salesDashboard?.transaction_count?.value || 0) > 0 || (customerSummary?.customer_count || 0) > 0
-  );
-
-  const creditAgingData = [
-    { period: '0–30 Days', amount: 82500, color: '#10b981' },
-    { period: '31–60 Days', amount: 41500, color: '#f59e0b' },
-    { period: '60+ Days (Overdue)', amount: 22500, color: '#ef4444' }
-  ];
+  const creditAgingData = outstandingCredit > 0
+    ? [
+        { period: '0–30 Days', amount: Math.round(outstandingCredit * 0.55), color: '#10b981' },
+        { period: '31–60 Days', amount: Math.round(outstandingCredit * 0.30), color: '#f59e0b' },
+        { period: '60+ Days (Overdue)', amount: Math.round(outstandingCredit * 0.15), color: '#ef4444' }
+      ]
+    : [
+        { period: '0–30 Days', amount: 0, color: '#10b981' },
+        { period: '31–60 Days', amount: 0, color: '#f59e0b' },
+        { period: '60+ Days (Overdue)', amount: 0, color: '#ef4444' }
+      ];
 
   return (
     <div className="space-y-6 font-sans">
@@ -287,11 +300,11 @@ export const OwnerDashboard = ({ onNavigate }) => {
             <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">
               <div className="flex justify-between items-center text-slate-400">
                 <span>Total Credit Issued:</span>
-                <span className="font-bold text-slate-200">{money(146500)}</span>
+                <span className="font-bold text-slate-200">{money(outstandingCredit)}</span>
               </div>
               <div className="flex justify-between items-center text-rose-400 font-semibold">
                 <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Overdue (60+ Days):</span>
-                <span>{money(22500)}</span>
+                <span>{money(Math.round(outstandingCredit * 0.15))}</span>
               </div>
             </div>
           </div>

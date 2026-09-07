@@ -15,6 +15,18 @@ export const API_BASE_URL = rawBaseUrl
 
 export const resolveApiAsset = (path) => path ? `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}` : null;
 
+const getStoredAccessToken = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('marketmind.tokens') || sessionStorage.getItem('marketmind.tokens');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.access_token || null;
+  } catch {
+    return null;
+  }
+};
+
 export class ApiError extends Error {
   constructor(message, status) {
     super(message);
@@ -24,9 +36,10 @@ export class ApiError extends Error {
 }
 
 export const request = async (path, { token, ...options } = {}) => {
+  const effectiveToken = token || getStoredAccessToken();
   const headers = {
     ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {}),
     ...options.headers
   };
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });

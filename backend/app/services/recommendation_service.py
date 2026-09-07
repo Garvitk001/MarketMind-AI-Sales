@@ -1,3 +1,4 @@
+from uuid import UUID
 from typing import List, Optional, Tuple, Dict, Any
 from sqlalchemy.orm import Session
 import logging
@@ -160,17 +161,22 @@ def generate_ai_reasoning(
 
     return " — ".join(parts) + "."
 
-def calculate_evaluation_metrics(db: Session, k: int = 5) -> EvaluationMetrics:
-    customers = db.query(Customer).limit(10).all()
-    products = db.query(Product).all()
+def calculate_evaluation_metrics(db: Session, tenant_id: Optional[UUID] = None, k: int = 5) -> EvaluationMetrics:
+    cust_query = db.query(Customer)
+    prod_query = db.query(Product)
+    if tenant_id:
+        cust_query = cust_query.filter(Customer.tenant_id == tenant_id)
+        prod_query = prod_query.filter(Product.tenant_id == tenant_id)
+    customers = cust_query.limit(10).all()
+    products = prod_query.all()
 
     if not customers or not products:
         return EvaluationMetrics(
             k=k,
-            precision_at_k=0.842,
-            recall_at_k=0.785,
-            f1_score_at_k=0.812,
-            total_evaluated_queries=42
+            precision_at_k=0.0,
+            recall_at_k=0.0,
+            f1_score_at_k=0.0,
+            total_evaluated_queries=0
         )
 
     total_precision = 0.0
@@ -182,12 +188,12 @@ def calculate_evaluation_metrics(db: Session, k: int = 5) -> EvaluationMetrics:
         relevant_set = {s.id for s in customer_sales if s.id}
         
         if not relevant_set:
-            relevant_set = {p.id for p in products if p.category in ["Terminals", "Hardware", "Supplies"]}
+            relevant_set = {p.id for p in products if (p.category or "") in ["Terminals", "Hardware", "Supplies"]}
 
         if not relevant_set:
             continue
 
-        recs = get_product_recommendations(db, customer_id=str(cust.id), limit=k, include_eval=False)
+        recs = get_product_recommendations(db, tenant_id=tenant_id, customer_id=str(cust.external_customer_id or cust.id), limit=k, include_eval=False)
         recommended_skus = [r.sku for r in recs.recommendations]
 
         hits = sum(1 for sku in recommended_skus if sku in relevant_set)
@@ -198,20 +204,21 @@ def calculate_evaluation_metrics(db: Session, k: int = 5) -> EvaluationMetrics:
         total_recall += recall
         query_count += 1
 
-    avg_precision = round(total_precision / query_count, 3) if query_count > 0 else 0.842
-    avg_recall = round(total_recall / query_count, 3) if query_count > 0 else 0.785
-    f1 = round(2 * (avg_precision * avg_recall) / (avg_precision + avg_recall), 3) if (avg_precision + avg_recall) > 0 else 0.812
+    avg_precision = round(total_precision / query_count, 3) if query_count > 0 else 0.0
+    avg_recall = round(total_recall / query_count, 3) if query_count > 0 else 0.0
+    f1 = round(2 * (avg_precision * avg_recall) / (avg_precision + avg_recall), 3) if (avg_precision + avg_recall) > 0 else 0.0
 
     return EvaluationMetrics(
         k=k,
         precision_at_k=avg_precision,
         recall_at_k=avg_recall,
         f1_score_at_k=f1,
-        total_evaluated_queries=max(query_count, 42)
+        total_evaluated_queries=max(query_count, 0)
     )
 
 def get_product_recommendations(
     db: Session,
+    tenant_id: Optional[UUID] = None,
     customer_id: Optional[str] = None,
     sku: Optional[str] = None,
     category: Optional[str] = None,
@@ -220,13 +227,19 @@ def get_product_recommendations(
     limit: int = 10,
     include_eval: bool = True
 ) -> RecommendationResponse:
-    logger.info(f"Generating recommendations (role={role}, customer_id={customer_id}, sku={sku}, category={category}, strategy={strategy})")
+    logger.info(f"Generating recommendations (tenant={tenant_id}, role={role}, customer_id={customer_id}, sku={sku}, category={category}, strategy={strategy})")
 
-    customer = db.query(Customer).filter(Customer.external_customer_id == customer_id).first() if customer_id else None
-    base_product = db.query(Product).filter(Product.sku == sku).first() if sku else None
+    cust_query = db.query(Customer)
+    prod_query = db.query(Product)
+    if tenant_id:
+        cust_query = cust_query.filter(Customer.tenant_id == tenant_id)
+        prod_query = prod_query.filter(Product.tenant_id == tenant_id)
+
+    customer = cust_query.filter(Customer.external_customer_id == customer_id).first() if customer_id else None
+    base_product = prod_query.filter(Product.sku == sku).first() if sku else None
     base_category = category or (base_product.category if base_product else None)
 
-    query = db.query(Product)
+    query = prod_query
     if sku:
         query = query.filter(Product.sku != sku)
     if category and category != "All Categories":
@@ -329,16 +342,21 @@ def get_product_recommendations(
         evaluation=eval_metrics
     )
 
-def get_recommendation_analytics(db: Session) -> RecommendationAnalytics:
-    products = db.query(Product).all()
+def get_recommendation_analytics(db: Session, tenant_id: Optional[UUID] = None) -> RecommendationAnalytics:
+    prod_query = db.query(Product)
+    if tenant_id:
+        prod_query = prod_query.filter(Product.tenant_id == tenant_id)
+    products = prod_query.all()
     if not products:
         return RecommendationAnalytics(
             potential_revenue_boost=0.0,
-            top_recommended_category="Terminals",
+            top_recommended_category="No Products",
             active_signals_count=0,
             avg_match_score=0.0,
-            precision_at_k=0.842,
-            recall_at_k=0.785
+            precision_at_k=0.0,
+            recall_at_k=0.0,
+            collaborative_coverage=0.0,
+            association_rules_count=0
         )
 
     total_revenue_potential = sum(getattr(p, 'unit_price', 199.0) * (5 if p.category == "Supplies" else 2) for p in products)
@@ -349,7 +367,7 @@ def get_recommendation_analytics(db: Session) -> RecommendationAnalytics:
         category_counts[p.category] = category_counts.get(p.category, 0) + 1
     top_category = max(category_counts, key=category_counts.get) if category_counts else "Terminals"
 
-    eval_metrics = calculate_evaluation_metrics(db, k=5)
+    eval_metrics = calculate_evaluation_metrics(db, tenant_id=tenant_id, k=5)
 
     return RecommendationAnalytics(
         potential_revenue_boost=total_revenue_potential,
@@ -362,10 +380,16 @@ def get_recommendation_analytics(db: Session) -> RecommendationAnalytics:
         association_rules_count=24
     )
 
-def get_recommendation_insights(db: Session) -> RecommendationInsights:
+def get_recommendation_insights(db: Session, tenant_id: Optional[UUID] = None) -> RecommendationInsights:
     """Generate data-driven natural-language insights from real product/sales data."""
-    products = db.query(Product).all()
-    sales = db.query(SalesTransaction).limit(500).all()
+    prod_query = db.query(Product)
+    sales_query = db.query(SalesTransaction)
+    if tenant_id:
+        prod_query = prod_query.filter(Product.tenant_id == tenant_id)
+        sales_query = sales_query.filter(SalesTransaction.tenant_id == tenant_id)
+
+    products = prod_query.all()
+    sales = sales_query.limit(500).all()
 
     if not products:
         return RecommendationInsights(
@@ -428,7 +452,7 @@ def get_recommendation_insights(db: Session) -> RecommendationInsights:
                 freq[pid] = freq.get(pid, 0) + 1
             if freq:
                 top_pid = max(freq, key=freq.get)
-                top_product = db.query(Product).filter(Product.id == top_pid).first()
+                top_product = prod_query.filter(Product.id == top_pid).first()
                 if top_product:
                     insights.append(
                         f"'{top_product.name}' is the most frequently purchased product "
