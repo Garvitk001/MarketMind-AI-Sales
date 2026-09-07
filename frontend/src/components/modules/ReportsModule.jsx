@@ -37,6 +37,7 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { Modal } from '../ui/Modal';
 import { useAuth } from '../../context/AuthContext';
 
 const HORIZONS = [7, 14, 30];
@@ -265,7 +266,7 @@ const dataSourceLabel = (value) => ({
   tenant_database: 'Tenant database records',
 }[value] || String(value || 'Source not reported'));
 
-export const ReportsModule = () => {
+export const ReportsModule = ({ onNavigate }) => {
   const { api, currentRole, access } = useAuth();
 
   const roleId = currentRole?.id || 'owner';
@@ -276,6 +277,7 @@ export const ReportsModule = () => {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [generatedAt, setGeneratedAt] = useState(null);
   const [category, setCategory] = useState('ALL');
   const [product, setProduct] = useState('');
@@ -385,7 +387,18 @@ export const ReportsModule = () => {
       setGeneratedAt(new Date());
     } catch (err) {
       setReportData(null);
-      setError(err?.message || 'Unable to generate the report.');
+      const msg = err?.message || 'Unable to generate the report.';
+      setError(msg);
+      if (
+        msg.toLowerCase().includes('model') ||
+        msg.toLowerCase().includes('segmentation') ||
+        msg.toLowerCase().includes('history') ||
+        msg.toLowerCase().includes('not available') ||
+        msg.toLowerCase().includes('not found') ||
+        msg.toLowerCase().includes('failed')
+      ) {
+        setShowHistoryModal(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -1141,15 +1154,102 @@ export const ReportsModule = () => {
         </div>
       </Card>
 
-      {/* Error Message */}
+      {/* Error Message & Setup Target Guidance */}
       {error && (
-        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-300 text-xs space-y-1">
-          <p className="font-bold flex items-center gap-1">
-            <AlertTriangle className="w-4 h-4" /> Report generation failed:
-          </p>
-          <p>{error}</p>
+        <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="space-y-1">
+              <p className="font-bold text-sm flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="w-4 h-4" /> Report generation failed:
+              </p>
+              <div className="text-slate-600 dark:text-slate-400 leading-relaxed max-w-2xl space-y-1">
+                <p>{error}</p>
+                <p className="text-slate-500 dark:text-slate-400 text-[11px]">
+                  AI forecasting and customer segmentation require recorded transaction history to train intelligence models.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHistoryModal(true)}
+              >
+                View Targets
+              </Button>
+              {onNavigate && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={ArrowUpRight}
+                  onClick={() => onNavigate('setup')}
+                >
+                  Open Business Setup
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Target Requirements Modal Popup */}
+      <Modal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        title="Sales History Required to Unlock AI Forecasting"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-200">
+            <Sparkles className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+            <p className="text-xs leading-relaxed">
+              Your business workspace is completely fresh and isolated. AI forecasting algorithms and customer segmentation models require recorded transaction history before generating commercial projections.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Target Milestones to Unlock AI Forecasting:
+            </h4>
+            <div className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
+              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                <Target className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span><strong>30+ Completed Sales Transactions</strong> across at least 30 days of trading</span>
+              </div>
+              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                <Users className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span><strong>20+ Customer Accounts</strong> for behavioral clustering</span>
+              </div>
+              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                <Layers className="w-4 h-4 text-purple-500 shrink-0" />
+                <span><strong>Store Location & Product Catalog</strong> with live stock levels</span>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            Use the <strong>Business Setup</strong> hub to create store locations, invite team members, or import historical CSV business data.
+          </p>
+        </div>
+
+        <div className="mt-6 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+          <Button variant="outline" size="sm" onClick={() => setShowHistoryModal(false)}>
+            Dismiss
+          </Button>
+          {onNavigate && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={ArrowUpRight}
+              onClick={() => {
+                setShowHistoryModal(false);
+                onNavigate('setup');
+              }}
+            >
+              Open Business Setup
+            </Button>
+          )}
+        </div>
+      </Modal>
 
       {/* Active Generated Report View */}
       {reportData && !loading && (

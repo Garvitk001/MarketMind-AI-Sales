@@ -183,7 +183,7 @@ const MainAppContent = () => {
       case 'ai_chat':
         return <AiChatModule />;
       case 'reports':
-        return <ReportsModule />;
+        return <ReportsModule onNavigate={setActiveTab} />;
       case 'components':
         return <UIComponentLibrary />;
       case 'settings':

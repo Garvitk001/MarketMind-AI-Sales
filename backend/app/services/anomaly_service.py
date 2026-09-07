@@ -41,9 +41,9 @@ def get_anomaly_summary(
 ) -> AnomalySummaryResponse:
     """
     Scans sales transactions, inventory stock movements, and revenue forecast residuals
-    using Isolation Forest & z-score statistical thresholding.
+    using Isolation Forest & z-score statistical thresholding scoped strictly to the tenant.
     """
-    products = db.query(Product).all()
+    products = db.query(Product).filter(Product.tenant_id == tenant_id).all()
     events: list[AnomalyEventRecord] = []
 
     for p in products:
@@ -66,38 +66,6 @@ def get_anomaly_summary(
                 )
             )
 
-    # If no events found (e.g. initial dev database), provide structured realistic alerts
-    if not events:
-        now = datetime.now(timezone.utc)
-        events = [
-            AnomalyEventRecord(
-                id=EVENT_UUID_1,
-                tenant_id=tenant_id,
-                anomaly_type="sales_spike",
-                severity="Warning",
-                entity_type="Transaction",
-                entity_id="TX-9042",
-                anomaly_score=0.78,
-                title="Unusual Sales Spike Detected",
-                description="Transaction value of ₹4,850.00 is 3.4x higher than 30-day moving average.",
-                status=ANOMALY_STATUS_STORE.get(str(EVENT_UUID_1), "detected"),
-                created_at=now,
-            ),
-            AnomalyEventRecord(
-                id=EVENT_UUID_2,
-                tenant_id=tenant_id,
-                anomaly_type="inventory_shrinkage",
-                severity="Critical",
-                entity_type="Inventory",
-                entity_id="SKU-8821",
-                anomaly_score=0.92,
-                title="Rapid Stock Depletion Anomaly",
-                description="POS Terminal SKU-8821 depleted by 45 units in 2 hours.",
-                status=ANOMALY_STATUS_STORE.get(str(EVENT_UUID_2), "detected"),
-                created_at=now,
-            ),
-        ]
-
     # Apply severity filter if requested
     if severity_filter:
         events = [
@@ -109,11 +77,18 @@ def get_anomaly_summary(
     info_cnt = sum(1 for e in events if e.severity == "Info")
     unresolved_cnt = sum(1 for e in events if e.status == "detected")
 
-    insights = [
-        f"Isolation Forest model (contamination rate {contamination * 100:.1f}%) detected {len(events)} operational anomaly event(s).",
-        f"{critical_cnt} critical anomaly alert(s) require immediate review.",
-        "Sales transaction values and stock movements were scanned against historical moving baseline.",
-    ]
+    if events:
+        insights = [
+            f"Isolation Forest model (contamination rate {contamination * 100:.1f}%) detected {len(events)} operational anomaly event(s).",
+            f"{critical_cnt} critical anomaly alert(s) require immediate review.",
+            "Sales transaction values and stock movements were scanned against historical moving baseline.",
+        ]
+    else:
+        insights = [
+            "No operational anomalies detected in this workspace.",
+            "All product inventory levels and transaction moving averages are operating within expected parameters.",
+            "Live Isolation Forest scanner is active and monitoring business telemetry.",
+        ]
 
     return AnomalySummaryResponse(
         scope="tenant",

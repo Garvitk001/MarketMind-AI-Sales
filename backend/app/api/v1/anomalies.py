@@ -1,36 +1,39 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
+import logging
 
+from app.api.dependencies import CurrentUser
 from app.db.session import get_db
 from app.schemas.anomaly import AnomalyStatusActionRequest, AnomalySummaryResponse
 from app.services.anomaly_service import get_anomaly_summary, update_anomaly_status
+
+logger = logging.getLogger("marketmind.api.anomalies")
 
 router = APIRouter(prefix="/anomalies", tags=["Isolation Forest Anomaly Detection"])
 
 
 @router.get("", response_model=AnomalySummaryResponse, summary="Get Isolation Forest Anomaly Detection Summary & Event Alerts")
 def read_anomalies(
-    tenant_id: UUID = Query(default="11111111-1111-1111-1111-111111111111", description="Target tenant ID"),
+    user: CurrentUser,
     severity: str | None = Query(default=None, description="Severity filter: 'critical', 'warning', 'info'"),
     contamination: float = Query(default=0.05, ge=0.01, le=0.20, description="Isolation Forest contamination factor"),
     db: Session = Depends(get_db)
 ):
     """
     Scans sales transactions, inventory stock movements, and revenue forecast residuals using
-    Scikit-Learn Isolation Forest & z-score statistical detection to identify operational anomalies.
+    Scikit-Learn Isolation Forest & z-score statistical detection scoped to the authenticated tenant.
     """
     try:
         summary = get_anomaly_summary(
             db=db,
-            tenant_id=tenant_id,
+            tenant_id=user.tenant_id,
             severity_filter=severity,
             contamination=contamination
         )
         return summary
     except Exception as e:
-        import logging
-        logging.getLogger("marketmind.api.anomalies").error("Anomaly detection failed: %s", e, exc_info=True)
+        logger.error("Anomaly detection failed: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to execute anomaly detection. Please try again later."

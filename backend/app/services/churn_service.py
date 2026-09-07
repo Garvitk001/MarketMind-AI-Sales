@@ -44,65 +44,10 @@ def _calculate_churn_risk(recency_days: int, order_count: int, total_revenue: fl
     return churn_probability, risk_score, risk_level, recommendation
 
 
-def _get_all_customers_or_fallback(db: Session, tenant_id: UUID) -> list[Customer]:
-    """Fetches DB customers or provides realistic small business accounts fallback."""
+def _get_tenant_customers(db: Session, tenant_id: UUID) -> list[Customer]:
+    """Fetches DB customers strictly belonging to the given tenant."""
     stmt = select(Customer).where(Customer.tenant_id == tenant_id)
-    customers = list(db.scalars(stmt).all())
-    
-    if not customers:
-        # Fallback to query all customers regardless of tenant_id
-        customers = list(db.scalars(select(Customer)).all())
-
-    if not customers:
-        now = datetime.now(timezone.utc)
-        c1 = Customer(
-            id=UUID("c1111111-1111-1111-1111-111111111111"),
-            tenant_id=tenant_id,
-            external_customer_id="CUST-1001",
-            recency_days=78,
-            order_count=14,
-            total_revenue=Decimal("45800.00"),
-            last_purchase=now
-        )
-        c2 = Customer(
-            id=UUID("c2222222-2222-2222-2222-222222222222"),
-            tenant_id=tenant_id,
-            external_customer_id="CUST-1002",
-            recency_days=62,
-            order_count=8,
-            total_revenue=Decimal("28400.00"),
-            last_purchase=now
-        )
-        c3 = Customer(
-            id=UUID("c3333333-3333-3333-3333-333333333333"),
-            tenant_id=tenant_id,
-            external_customer_id="CUST-1003",
-            recency_days=45,
-            order_count=22,
-            total_revenue=Decimal("62100.00"),
-            last_purchase=now
-        )
-        c4 = Customer(
-            id=UUID("c4444444-4444-4444-4444-444444444444"),
-            tenant_id=tenant_id,
-            external_customer_id="CUST-1004",
-            recency_days=18,
-            order_count=35,
-            total_revenue=Decimal("115000.00"),
-            last_purchase=now
-        )
-        c5 = Customer(
-            id=UUID("c5555555-5555-5555-5555-555555555555"),
-            tenant_id=tenant_id,
-            external_customer_id="CUST-1005",
-            recency_days=12,
-            order_count=41,
-            total_revenue=Decimal("189000.00"),
-            last_purchase=now
-        )
-        customers = [c1, c2, c3, c4, c5]
-        
-    return customers
+    return list(db.scalars(stmt).all())
 
 
 def get_churn_summary(db: Session, tenant_id: UUID, store_id: UUID | None = None) -> ChurnSummaryResponse:
@@ -110,7 +55,32 @@ def get_churn_summary(db: Session, tenant_id: UUID, store_id: UUID | None = None
     Generates a churn summary for the given tenant and optional store.
     Uses Scikit-Learn (Logistic Regression baseline & Random Forest) to validate tabular churn features.
     """
-    customers = _get_all_customers_or_fallback(db, tenant_id)
+    customers = _get_tenant_customers(db, tenant_id)
+
+    if not customers:
+        return ChurnSummaryResponse(
+            scope="tenant",
+            tenant_id=tenant_id,
+            store_id=store_id,
+            model_version="v1.0.0-churn",
+            algorithm="LogisticRegression",
+            trained_at=datetime.now(timezone.utc),
+            accuracy=0.0,
+            precision=0.0,
+            recall=0.0,
+            f1_score=0.0,
+            total_customers_analyzed=0,
+            high_risk_count=0,
+            medium_risk_count=0,
+            low_risk_count=0,
+            overall_churn_rate=0.0,
+            potential_revenue_at_risk=Decimal("0.00"),
+            insights=[
+                "No customer records found in this business workspace yet.",
+                "Import customer accounts and transaction history via Business Setup to train the AI Churn Retention model.",
+                "Real-time RFM scoring will activate once customer accounts are created.",
+            ]
+        )
 
     X = []
     y = []
@@ -195,7 +165,7 @@ def get_churn_customer_list(
     """
     Returns a paginated list of customers with churn scores and recommendations.
     """
-    customers = _get_all_customers_or_fallback(db, tenant_id)
+    customers = _get_tenant_customers(db, tenant_id)
     
     records: list[ChurnCustomerRecord] = []
     for c in customers:
