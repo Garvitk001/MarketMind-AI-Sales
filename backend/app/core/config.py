@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Any
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,7 +16,10 @@ class Settings(BaseSettings):
     app_name: str = "MarketMind API"
     environment: str = "development"
     api_v1_prefix: str = "/api/v1"
-    database_url: str = "sqlite:///./marketmind.db"
+    database_url: str = Field(
+        default="sqlite:///./marketmind.db",
+        validation_alias=AliasChoices("MARKETMIND_DATABASE_URL", "DATABASE_URL", "database_url"),
+    )
     jwt_secret: SecretStr = SecretStr("development-only-secret-change-before-deploy")
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 15
@@ -47,8 +50,14 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = None
     smtp_from_email: str | None = None
     smtp_starttls: bool = True
-    resend_api_key: SecretStr | None = None
-    resend_from_email: str = "onboarding@resend.dev"
+    resend_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MARKETMIND_RESEND_API_KEY", "RESEND_API_KEY", "resend_api_key"),
+    )
+    resend_from_email: str = Field(
+        default="onboarding@resend.dev",
+        validation_alias=AliasChoices("MARKETMIND_RESEND_FROM_EMAIL", "RESEND_FROM_EMAIL", "resend_from_email"),
+    )
     initial_admin_email: str | None = None
     initial_admin_password: SecretStr | None = None
 
