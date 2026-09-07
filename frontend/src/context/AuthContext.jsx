@@ -222,6 +222,14 @@ export const AuthProvider = ({ children }) => {
       })
     });
 
+  const refreshProfile = async () => {
+    if (!tokens?.access_token) return null;
+    const nextProfile = await api('/users/me');
+    setProfile(nextProfile);
+    setUserEmail(nextProfile.email);
+    return nextProfile;
+  };
+
   const value = {
     isAuthenticated: Boolean(tokens && access),
     isInitializing,
@@ -229,6 +237,7 @@ export const AuthProvider = ({ children }) => {
     access,
     profile,
     userEmail,
+    refreshProfile,
     login,
     loginWithDeveloperOtp,
     requestDeveloperOtp,

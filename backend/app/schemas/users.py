@@ -50,8 +50,17 @@ class UserResponse(ORMModel):
     currency: str
     store: StoreResponse | None
     email_verified_at: datetime | None
+    email_verified: bool = False
     mfa_enabled: bool
     role: RoleResponse
+
+
+class BusinessProfileUpdate(BaseModel):
+    business_name: str | None = Field(default=None, min_length=2, max_length=160)
+    currency: str | None = Field(default=None, min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
+    timezone: str | None = Field(default=None, min_length=2, max_length=64)
+    phone_number: str | None = Field(default=None, max_length=24)
+    gstin: str | None = Field(default=None, max_length=60)
 
 
 class ProfileUpdate(BaseModel):

@@ -91,14 +91,25 @@ const formatDate = (value, format) => {
 };
 
 export const SettingsModule = ({ onNavigate }) => {
-  const { currentRole, profile, updateProfile, uploadAvatar, deleteAvatar } = useAuth();
+  const { currentRole, profile, updateProfile, uploadAvatar, deleteAvatar, api, refreshProfile } = useAuth();
   const { setThemePreference } = useTheme();
   const { addToast } = useToast();
   const fileInput = useRef(null);
   const isAdmin = currentRole.id === 'admin';
+  const isOwner = currentRole.id === 'owner';
   const [saving, setSaving] = useState(false);
+  const [savingBiz, setSavingBiz] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
+  const [savedBizAt, setSavedBizAt] = useState(null);
   const [uploading, setUploading] = useState(false);
+
+  const [bizForm, setBizForm] = useState({
+    business_name: '',
+    currency: 'INR',
+    timezone: 'Asia/Kolkata',
+    phone_number: '',
+  });
+
   const [form, setForm] = useState({
     full_name: '',
     phone_number: '',
@@ -132,14 +143,54 @@ export const SettingsModule = ({ onNavigate }) => {
       dashboard_density: profile.dashboard_density || preferenceDefaults.dashboard_density,
       email_notifications: profile.email_notifications ?? true,
     });
+
+    setBizForm({
+      business_name: profile.tenant_name || '',
+      currency: profile.currency || 'INR',
+      timezone: profile.timezone || 'Asia/Kolkata',
+      phone_number: profile.phone_number || '',
+    });
   }, [currentRole.id, profile]);
 
   const updateField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const updateBizField = (field, value) => setBizForm((current) => ({ ...current, [field]: value }));
+
   const updateRolePreference = (field, value) =>
     setForm((current) => ({
       ...current,
       role_preferences: { ...current.role_preferences, [field]: value },
     }));
+
+  const saveBusinessProfile = async (event) => {
+    event?.preventDefault?.();
+    setSavingBiz(true);
+    try {
+      await api('/users/me/business', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          business_name: bizForm.business_name.trim(),
+          currency: bizForm.currency.trim().toUpperCase(),
+          timezone: bizForm.timezone.trim(),
+          phone_number: bizForm.phone_number.trim() || null,
+        }),
+      });
+      await refreshProfile?.();
+      setSavedBizAt(new Date());
+      addToast({
+        type: 'success',
+        title: 'Business Profile Updated',
+        message: 'Business name and details updated successfully across MarketMind.'
+      });
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Failed to Update Business Profile',
+        message: error.message || 'Error updating business settings.'
+      });
+    } finally {
+      setSavingBiz(false);
+    }
+  };
 
   const saveSettings = async (event) => {
     event.preventDefault();
@@ -414,6 +465,17 @@ export const SettingsModule = ({ onNavigate }) => {
         </div>
       )}
 
+      {/* Business Owner Enterprise Profile Section */}
+      {isOwner && (
+        <BusinessProfileCard
+          bizForm={bizForm}
+          updateBizField={updateBizField}
+          saveBusinessProfile={saveBusinessProfile}
+          savingBiz={savingBiz}
+          savedBizAt={savedBizAt}
+        />
+      )}
+
       {/* Preferences Section */}
       <Preferences form={form} updateField={updateField} isAdmin={isAdmin} />
 
@@ -524,6 +586,84 @@ const RoleDetails = ({ profile, currentRole, onNavigate }) => {
     </Card>
   );
 };
+
+const BusinessProfileCard = ({ bizForm, updateBizField, saveBusinessProfile, savingBiz, savedBizAt }) => (
+  <Card hoverEffect={false}>
+    <CardHeader>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <BriefcaseBusiness className="w-5 h-5 text-amber-500" />
+            <span>Business Enterprise Profile & Info</span>
+          </CardTitle>
+          <CardDescription>Manage business name, operational currency, and official info</CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          {savedBizAt && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300 bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-400/30">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Updated
+            </span>
+          )}
+          <Button
+            type="button"
+            icon={Save}
+            isLoading={savingBiz}
+            onClick={saveBusinessProfile}
+            className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3.5 py-1.5"
+          >
+            Save Business Info
+          </Button>
+        </div>
+      </div>
+    </CardHeader>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <Input
+        id="bizName"
+        label="Registered Business Name"
+        value={bizForm.business_name}
+        onChange={(e) => updateBizField('business_name', e.target.value)}
+        placeholder="e.g. Apex Retail Enterprises"
+        required
+      />
+      <div>
+        <label className={fieldLabel}>Operational Currency</label>
+        <select
+          value={bizForm.currency}
+          onChange={(e) => updateBizField('currency', e.target.value)}
+          className={selectClass}
+        >
+          <option value="INR">INR (₹) - Indian Rupee</option>
+          <option value="USD">USD ($) - US Dollar</option>
+          <option value="EUR">EUR (€) - Euro</option>
+          <option value="GBP">GBP (£) - British Pound</option>
+          <option value="AED">AED (د.إ) - UAE Dirham</option>
+        </select>
+      </div>
+      <div>
+        <label className={fieldLabel}>Business Timezone</label>
+        <select
+          value={bizForm.timezone}
+          onChange={(e) => updateBizField('timezone', e.target.value)}
+          className={selectClass}
+        >
+          <option value="Asia/Kolkata">Asia/Kolkata (IST +5:30)</option>
+          <option value="Asia/Dubai">Asia/Dubai (GST +4:00)</option>
+          <option value="UTC">UTC (Universal Coordinated Time)</option>
+          <option value="America/New_York">America/New_York (EST)</option>
+          <option value="Europe/London">Europe/London (GMT)</option>
+        </select>
+      </div>
+      <Input
+        id="bizPhone"
+        label="Commercial Helpline / Phone"
+        value={bizForm.phone_number}
+        onChange={(e) => updateBizField('phone_number', e.target.value)}
+        placeholder="+91 98765 43210"
+      />
+    </div>
+  </Card>
+);
 
 const Preferences = ({ form, updateField, isAdmin }) => (
   <Card hoverEffect={false}>

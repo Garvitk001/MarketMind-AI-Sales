@@ -27,6 +27,9 @@ import {
   Store,
   Target,
   ArrowUpRight,
+  Edit2,
+  Trash2,
+  PackagePlus,
 } from 'lucide-react';
 
 const getProductUnitPrice = (productOrItem) => {
@@ -90,6 +93,36 @@ export const ManagerDashboard = () => {
   const [adjustmentType, setAdjustmentType] = useState('inward');
   const [adjustmentReason, setAdjustmentReason] = useState('Supplier Delivery Receipt');
   const [isAdjusting, setIsAdjusting] = useState(false);
+
+  // Manual Product Management (Add, Edit, Delete)
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [addProductForm, setAddProductForm] = useState({
+    name: '',
+    sku: '',
+    category: 'General',
+    unit_price: '499',
+    stock_quantity: '50',
+    reorder_level: '10',
+    batch_number: '',
+    expiry_date: '',
+  });
+
+  const [editProductItem, setEditProductItem] = useState(null);
+  const [isEditingProduct, setIsEditingProduct] = useState(false);
+  const [editProductForm, setEditProductForm] = useState({
+    name: '',
+    sku: '',
+    category: '',
+    unit_price: '',
+    stock_quantity: '',
+    reorder_level: '',
+    batch_number: '',
+    expiry_date: '',
+  });
+
+  const [deleteProductItem, setDeleteProductItem] = useState(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
 
   // Store Exec Performance Telemetry
   const [storeExecs, setStoreExecs] = useState([]);
@@ -336,6 +369,107 @@ export const ManagerDashboard = () => {
     setSelectedPoItem(null);
   };
 
+  const handleCreateProduct = async (e) => {
+    e.preventDefault();
+    if (!addProductForm.name.trim() || !addProductForm.sku.trim()) {
+      addToast('Product name and SKU are required', 'error');
+      return;
+    }
+
+    setIsAddingProduct(true);
+    try {
+      await api('/inventory', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: addProductForm.name.trim(),
+          sku: addProductForm.sku.trim().toUpperCase(),
+          category: addProductForm.category.trim() || 'General',
+          unit_price: parseFloat(addProductForm.unit_price) || 0,
+          stock_quantity: parseInt(addProductForm.stock_quantity, 10) || 0,
+          reorder_level: parseInt(addProductForm.reorder_level, 10) || 10,
+          batch_number: addProductForm.batch_number.trim() || `BATCH-${addProductForm.sku.trim().toUpperCase()}`,
+          expiry_date: addProductForm.expiry_date.trim() || null,
+        }),
+      });
+      addToast(`Product ${addProductForm.name} (${addProductForm.sku}) added successfully!`, 'success');
+      setIsAddProductOpen(false);
+      setAddProductForm({
+        name: '',
+        sku: '',
+        category: 'General',
+        unit_price: '499',
+        stock_quantity: '50',
+        reorder_level: '10',
+        batch_number: '',
+        expiry_date: '',
+      });
+      await refresh();
+    } catch (error) {
+      addToast(error.message || 'Failed to create product', 'error');
+    } finally {
+      setIsAddingProduct(false);
+    }
+  };
+
+  const handleOpenEditModal = (item) => {
+    setEditProductItem(item);
+    setEditProductForm({
+      name: item.name,
+      sku: item.id,
+      category: item.category,
+      unit_price: String(item.unitPriceNum || 499),
+      stock_quantity: String(item.stock || 0),
+      reorder_level: String(item.minStock || 10),
+      batch_number: item.batchNumber || '',
+      expiry_date: item.expiryDate || '',
+    });
+  };
+
+  const handleUpdateProduct = async (e) => {
+    e.preventDefault();
+    if (!editProductItem) return;
+    setIsEditingProduct(true);
+    try {
+      await api(`/inventory/${editProductItem.rawId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: editProductForm.name.trim(),
+          sku: editProductForm.sku.trim().toUpperCase(),
+          category: editProductForm.category.trim(),
+          unit_price: parseFloat(editProductForm.unit_price) || 0,
+          stock_quantity: parseInt(editProductForm.stock_quantity, 10) || 0,
+          reorder_level: parseInt(editProductForm.reorder_level, 10) || 10,
+          batch_number: editProductForm.batch_number.trim() || null,
+          expiry_date: editProductForm.expiry_date.trim() || null,
+        }),
+      });
+      addToast(`Product ${editProductForm.name} updated successfully!`, 'success');
+      setEditProductItem(null);
+      await refresh();
+    } catch (error) {
+      addToast(error.message || 'Failed to update product', 'error');
+    } finally {
+      setIsEditingProduct(false);
+    }
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!deleteProductItem) return;
+    setIsDeletingProduct(true);
+    try {
+      await api(`/inventory/${deleteProductItem.rawId}`, {
+        method: 'DELETE',
+      });
+      addToast(`Product ${deleteProductItem.name} (${deleteProductItem.id}) deleted!`, 'success');
+      setDeleteProductItem(null);
+      await refresh();
+    } catch (error) {
+      addToast(error.message || 'Failed to delete product', 'error');
+    } finally {
+      setIsDeletingProduct(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Top Banner Header */}
@@ -362,15 +496,25 @@ export const ManagerDashboard = () => {
             onClick={exportStockRegisterCsv}
             className="bg-white/10 hover:bg-white/20 text-white border-white/20"
           >
-            Export Stock Register (CSV)
+            Export Stock (CSV)
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={PlusCircle}
+            onClick={() => handleOpenPoModal(null)}
+            className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+          >
+            PO Request
           </Button>
           <Button
             variant="primary"
             size="sm"
-            icon={PlusCircle}
-            onClick={() => handleOpenPoModal(null)}
+            icon={PackagePlus}
+            onClick={() => setIsAddProductOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg font-bold"
           >
-            Create Purchase Order
+            Add Product
           </Button>
         </div>
       </div>
@@ -702,13 +846,34 @@ export const ManagerDashboard = () => {
                     <td className="p-3 text-right">
                       <div className="flex justify-end items-center gap-1.5">
                         <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Edit2}
+                          onClick={() => handleOpenEditModal(item)}
+                          className="text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 px-2"
+                          title="Edit Product Details"
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Trash2}
+                          onClick={() => setDeleteProductItem(item)}
+                          className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 px-2"
+                          title="Delete Product"
+                        >
+                          Delete
+                        </Button>
+                        <Button
                           variant="outline"
                           size="sm"
                           icon={Layers}
                           onClick={() => handleOpenAdjustmentModal(item)}
                           className="text-xs"
+                          title="Record Stock Movement"
                         >
-                          Receive / Adjust
+                          Adjust
                         </Button>
                         <Button
                           variant="ghost"
@@ -716,6 +881,7 @@ export const ManagerDashboard = () => {
                           icon={Truck}
                           onClick={() => handleOpenPoModal(item)}
                           className="text-xs"
+                          title="Create Purchase Order"
                         >
                           PO
                         </Button>
@@ -852,6 +1018,224 @@ export const ManagerDashboard = () => {
               </Button>
               <Button variant="primary" icon={Mail} onClick={handleEmailPoSupplier}>
                 Dispatch PO Email
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Manual Add Product Modal */}
+      <Modal
+        isOpen={isAddProductOpen}
+        onClose={() => setIsAddProductOpen(false)}
+        title="Add New Commercial Product & Initial Stock"
+      >
+        <form onSubmit={handleCreateProduct} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              id="addProdName"
+              label="Product Name"
+              value={addProductForm.name}
+              onChange={(e) => setAddProductForm({ ...addProductForm, name: e.target.value })}
+              placeholder="e.g. Wireless Barcode Scanner"
+              required
+            />
+            <Input
+              id="addProdSku"
+              label="Product SKU Code"
+              value={addProductForm.sku}
+              onChange={(e) => setAddProductForm({ ...addProductForm, sku: e.target.value })}
+              placeholder="e.g. POS-SCAN-01"
+              required
+            />
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Product Category
+              </label>
+              <input
+                type="text"
+                value={addProductForm.category}
+                onChange={(e) => setAddProductForm({ ...addProductForm, category: e.target.value })}
+                placeholder="e.g. Electronics, Hardware, Apparel"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none"
+              />
+            </div>
+            <Input
+              id="addProdPrice"
+              label="Unit Selling Price (₹ INR)"
+              type="number"
+              step="0.01"
+              min="0"
+              value={addProductForm.unit_price}
+              onChange={(e) => setAddProductForm({ ...addProductForm, unit_price: e.target.value })}
+              required
+            />
+            <Input
+              id="addProdStock"
+              label="Initial Stock Units"
+              type="number"
+              min="0"
+              value={addProductForm.stock_quantity}
+              onChange={(e) => setAddProductForm({ ...addProductForm, stock_quantity: e.target.value })}
+              required
+            />
+            <Input
+              id="addProdReorder"
+              label="Safety Reorder Level (Units)"
+              type="number"
+              min="0"
+              value={addProductForm.reorder_level}
+              onChange={(e) => setAddProductForm({ ...addProductForm, reorder_level: e.target.value })}
+              required
+            />
+            <Input
+              id="addProdBatch"
+              label="Batch Number (Optional)"
+              value={addProductForm.batch_number}
+              onChange={(e) => setAddProductForm({ ...addProductForm, batch_number: e.target.value })}
+              placeholder="e.g. BATCH-2026-01"
+            />
+            <Input
+              id="addProdExpiry"
+              label="Expiry Date (Optional)"
+              type="date"
+              value={addProductForm.expiry_date}
+              onChange={(e) => setAddProductForm({ ...addProductForm, expiry_date: e.target.value })}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <Button type="button" variant="outline" onClick={() => setIsAddProductOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" icon={PackagePlus} isLoading={isAddingProduct}>
+              Save &amp; Add Product
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Product Details Modal */}
+      <Modal
+        isOpen={Boolean(editProductItem)}
+        onClose={() => setEditProductItem(null)}
+        title={`Edit Product: ${editProductItem?.name || ''}`}
+      >
+        {editProductItem && (
+          <form onSubmit={handleUpdateProduct} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                id="editProdName"
+                label="Product Name"
+                value={editProductForm.name}
+                onChange={(e) => setEditProductForm({ ...editProductForm, name: e.target.value })}
+                required
+              />
+              <Input
+                id="editProdSku"
+                label="Product SKU Code"
+                value={editProductForm.sku}
+                onChange={(e) => setEditProductForm({ ...editProductForm, sku: e.target.value })}
+                required
+              />
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Product Category
+                </label>
+                <input
+                  type="text"
+                  value={editProductForm.category}
+                  onChange={(e) => setEditProductForm({ ...editProductForm, category: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none"
+                />
+              </div>
+              <Input
+                id="editProdPrice"
+                label="Unit Selling Price (₹ INR)"
+                type="number"
+                step="0.01"
+                min="0"
+                value={editProductForm.unit_price}
+                onChange={(e) => setEditProductForm({ ...editProductForm, unit_price: e.target.value })}
+                required
+              />
+              <Input
+                id="editProdStock"
+                label="Stock Quantity (Units)"
+                type="number"
+                min="0"
+                value={editProductForm.stock_quantity}
+                onChange={(e) => setEditProductForm({ ...editProductForm, stock_quantity: e.target.value })}
+                required
+              />
+              <Input
+                id="editProdReorder"
+                label="Safety Reorder Level"
+                type="number"
+                min="0"
+                value={editProductForm.reorder_level}
+                onChange={(e) => setEditProductForm({ ...editProductForm, reorder_level: e.target.value })}
+                required
+              />
+              <Input
+                id="editProdBatch"
+                label="Batch Number"
+                value={editProductForm.batch_number}
+                onChange={(e) => setEditProductForm({ ...editProductForm, batch_number: e.target.value })}
+              />
+              <Input
+                id="editProdExpiry"
+                label="Expiry Date"
+                type="date"
+                value={editProductForm.expiry_date}
+                onChange={(e) => setEditProductForm({ ...editProductForm, expiry_date: e.target.value })}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <Button type="button" variant="outline" onClick={() => setEditProductItem(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" icon={CheckCircle2} isLoading={isEditingProduct}>
+                Update Product
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Delete Product Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(deleteProductItem)}
+        onClose={() => setDeleteProductItem(null)}
+        title="Confirm Product Deletion"
+      >
+        {deleteProductItem && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-2">
+              <p className="font-bold text-sm text-rose-200">
+                Are you sure you want to delete this product?
+              </p>
+              <p>
+                Product: <strong>{deleteProductItem.name}</strong> (SKU: {deleteProductItem.id})
+              </p>
+              <p className="text-slate-400">
+                This will remove the inventory record and product catalog details permanently from this store.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setDeleteProductItem(null)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                icon={Trash2}
+                isLoading={isDeletingProduct}
+                onClick={handleDeleteProduct}
+              >
+                Delete Product
               </Button>
             </div>
           </div>

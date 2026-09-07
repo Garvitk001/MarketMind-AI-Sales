@@ -13,6 +13,7 @@ import { Sidebar } from './components/common/Sidebar';
 import { Navbar } from './components/common/Navbar';
 import { ToastContainer } from './components/common/ToastContainer';
 import { AiAssistantModal } from './components/common/AiAssistantModal';
+import { EmailVerificationModal } from './components/common/EmailVerificationModal';
 import { UIComponentLibrary } from './components/common/UIComponentLibrary';
 
 import { OwnerDashboard } from './components/dashboards/OwnerDashboard';
@@ -216,6 +217,9 @@ const MainAppContent = () => {
         onNavigate={setActiveTab}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
       />
+
+      {/* Mandatory Email Verification Modal/Banner for unverified accounts */}
+      <EmailVerificationModal />
 
       {/* Dynamic Main Workspace Container */}
       <main

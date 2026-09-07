@@ -20,6 +20,7 @@ from app.schemas.auth import DevelopmentTokenResponse
 from app.schemas.common import MessageResponse
 from app.schemas.users import (
     AccountStateRequest,
+    BusinessProfileUpdate,
     InvitationAcceptRequest,
     ProfileUpdate,
     RoleChangeRequest,
@@ -156,6 +157,7 @@ def serialize_user(user: User) -> UserResponse:
         currency=user.tenant.currency,
         store=StoreResponse.model_validate(user.store) if user.store else None,
         email_verified_at=user.email_verified_at,
+        email_verified=bool(user.email_verified_at),
         mfa_enabled=user.mfa_enabled,
         role=serialize_role(user.role),
     )
@@ -188,6 +190,43 @@ def update_profile(payload: ProfileUpdate, request: Request, user: CurrentUser, 
     )
     db.commit()
     db.refresh(user)
+    return serialize_user(user)
+
+
+@router.patch("/me/business", response_model=UserResponse)
+def update_business_profile(
+    payload: BusinessProfileUpdate,
+    request: Request,
+    user: CurrentUser,
+    db: DBSession,
+):
+    require_business_owner(user)
+    tenant = user.tenant
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=422, detail="At least one business field is required")
+
+    if "business_name" in changes and changes["business_name"]:
+        tenant.name = changes["business_name"].strip()
+    if "currency" in changes and changes["currency"]:
+        tenant.currency = changes["currency"].strip().upper()
+    if "timezone" in changes and changes["timezone"]:
+        tenant.timezone = changes["timezone"].strip()
+        user.timezone = changes["timezone"].strip()
+    if "phone_number" in changes and changes["phone_number"]:
+        user.phone_number = changes["phone_number"].strip()
+
+    record_audit(
+        db,
+        event_type="owner.business_profile_updated",
+        request=request,
+        tenant_id=user.tenant_id,
+        actor_user_id=user.id,
+        details={"changes": changes},
+    )
+    db.commit()
+    db.refresh(user)
+    db.refresh(tenant)
     return serialize_user(user)
 
 

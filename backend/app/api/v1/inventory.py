@@ -5,13 +5,15 @@ from sqlalchemy import case, func, select
 
 from app.api.dependencies import DBSession, require_permissions
 from app.core.permissions import Permissions
-from app.models.identity import User
+from app.models.identity import Store, User
 from app.models.inventory import Inventory, Product
 from app.schemas.inventory import (
     InventoryList,
     InventoryResponse,
     InventorySummary,
     InventoryUpdate,
+    ProductCreate,
+    ProductUpdate,
 )
 from app.services.audit import record_audit
 from app.services.inventory import can_update_inventory, scoped_inventory_query
@@ -21,6 +23,11 @@ router = APIRouter(prefix="/inventory", tags=["Inventory"])
 inventory_reader = require_permissions(
     Permissions.INVENTORY_READ_ALL,
     Permissions.INVENTORY_READ_STORE,
+    require_all=False,
+)
+inventory_updater = require_permissions(
+    Permissions.INVENTORY_UPDATE_STORE,
+    Permissions.INVENTORY_READ_ALL,
     require_all=False,
 )
 
@@ -112,6 +119,100 @@ def list_inventory(
     return InventoryList(items=items, total=total, limit=limit, offset=offset)
 
 
+@router.post("", response_model=InventoryResponse, status_code=201)
+def create_product_inventory(
+    payload: ProductCreate,
+    request: Request,
+    db: DBSession,
+    user: User = Depends(inventory_updater),
+):
+    # Determine effective store
+    store_id = payload.store_id or user.store_id
+    if not store_id:
+        # Fallback to the first store in the tenant
+        default_store = db.scalars(
+            select(Store).where(Store.tenant_id == user.tenant_id).order_by(Store.created_at)
+        ).first()
+        if not default_store:
+            raise HTTPException(status_code=400, detail="No store found for this business. Please create a store first.")
+        store_id = default_store.id
+    else:
+        store = db.scalar(
+            select(Store).where(Store.id == store_id, Store.tenant_id == user.tenant_id)
+        )
+        if not store:
+            raise HTTPException(status_code=400, detail="Specified store is invalid or not in your business")
+
+    # Find or create Product
+    product = db.scalar(
+        select(Product).where(
+            Product.tenant_id == user.tenant_id,
+            Product.sku == payload.sku.strip(),
+        )
+    )
+    if not product:
+        product = Product(
+            tenant_id=user.tenant_id,
+            sku=payload.sku.strip(),
+            name=payload.name.strip(),
+            category=payload.category.strip() if payload.category else "General",
+            unit_mrp=payload.unit_price,
+            hsn_code="8471",
+            pack_size="1 Unit",
+            is_active=True,
+        )
+        db.add(product)
+        db.flush()
+    else:
+        # Update product metadata if existing
+        product.name = payload.name.strip()
+        if payload.category:
+            product.category = payload.category.strip()
+        if payload.unit_price is not None:
+            product.unit_mrp = payload.unit_price
+
+    # Find or create Inventory entry for this store
+    inventory = db.scalar(
+        select(Inventory).where(
+            Inventory.tenant_id == user.tenant_id,
+            Inventory.store_id == store_id,
+            Inventory.product_id == product.id,
+        )
+    )
+    if not inventory:
+        inventory = Inventory(
+            tenant_id=user.tenant_id,
+            store_id=store_id,
+            product_id=product.id,
+            stock_quantity=payload.stock_quantity,
+            reorder_level=payload.reorder_level,
+            batch_number=payload.batch_number or f"BATCH-{payload.sku.strip()}",
+            expiry_date=payload.expiry_date,
+        )
+        db.add(inventory)
+    else:
+        inventory.stock_quantity = payload.stock_quantity
+        inventory.reorder_level = payload.reorder_level
+        if payload.batch_number:
+            inventory.batch_number = payload.batch_number
+        if payload.expiry_date:
+            inventory.expiry_date = payload.expiry_date
+
+    record_audit(
+        db,
+        event_type="inventory.created",
+        request=request,
+        tenant_id=user.tenant_id,
+        actor_user_id=user.id,
+        target_type="inventory",
+        target_id=str(inventory.id) if inventory.id else str(product.id),
+        details={"sku": payload.sku, "name": payload.name, "store_id": str(store_id)},
+    )
+    db.commit()
+    db.refresh(inventory)
+    return inventory
+
+
 @router.get("/{inventory_id}", response_model=InventoryResponse)
 def get_inventory(
     inventory_id: UUID,
@@ -129,25 +230,44 @@ def get_inventory(
     return item
 
 
+@router.put("/{inventory_id}", response_model=InventoryResponse)
 @router.patch("/{inventory_id}", response_model=InventoryResponse)
-def update_inventory(
+def update_inventory_or_product(
     inventory_id: UUID,
-    payload: InventoryUpdate,
+    payload: ProductUpdate,
     request: Request,
     db: DBSession,
-    user: User = Depends(require_permissions(Permissions.INVENTORY_UPDATE_STORE)),
+    user: User = Depends(inventory_updater),
 ):
-    changes = payload.model_dump(exclude_unset=True)
-    if not changes:
-        raise HTTPException(status_code=422, detail="At least one inventory field is required")
-
     item = db.get(Inventory, inventory_id)
     if not item or not can_update_inventory(user, item):
         raise HTTPException(status_code=404, detail="Inventory record not found")
 
-    before = {field: getattr(item, field) for field in changes}
-    for field, value in changes.items():
-        setattr(item, field, value)
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=422, detail="At least one field is required to update")
+
+    # Update inventory fields
+    if "stock_quantity" in changes and changes["stock_quantity"] is not None:
+        item.stock_quantity = changes["stock_quantity"]
+    if "reorder_level" in changes and changes["reorder_level"] is not None:
+        item.reorder_level = changes["reorder_level"]
+    if "batch_number" in changes:
+        item.batch_number = changes["batch_number"]
+    if "expiry_date" in changes:
+        item.expiry_date = changes["expiry_date"]
+
+    # Update associated product fields
+    if item.product:
+        if "name" in changes and changes["name"]:
+            item.product.name = changes["name"].strip()
+        if "sku" in changes and changes["sku"]:
+            item.product.sku = changes["sku"].strip()
+        if "category" in changes and changes["category"]:
+            item.product.category = changes["category"].strip()
+        if "unit_price" in changes and changes["unit_price"] is not None:
+            item.product.unit_mrp = changes["unit_price"]
+
     record_audit(
         db,
         event_type="inventory.updated",
@@ -156,8 +276,47 @@ def update_inventory(
         actor_user_id=user.id,
         target_type="inventory",
         target_id=str(item.id),
-        details={"before": before, "after": changes},
+        details={"changes": {k: str(v) for k, v in changes.items()}},
     )
     db.commit()
     db.refresh(item)
     return item
+
+
+@router.delete("/{inventory_id}")
+def delete_inventory_product(
+    inventory_id: UUID,
+    request: Request,
+    db: DBSession,
+    user: User = Depends(inventory_updater),
+):
+    item = db.get(Inventory, inventory_id)
+    if not item or not can_update_inventory(user, item):
+        raise HTTPException(status_code=404, detail="Inventory record not found")
+
+    product_id = item.product_id
+    sku = item.product.sku if item.product else "UNKNOWN"
+    name = item.product.name if item.product else "UNKNOWN"
+
+    db.delete(item)
+    db.flush()
+
+    # Check if this product has other inventory entries
+    other_inv = db.scalar(select(Inventory).where(Inventory.product_id == product_id))
+    if not other_inv:
+        prod = db.get(Product, product_id)
+        if prod:
+            db.delete(prod)
+
+    record_audit(
+        db,
+        event_type="inventory.deleted",
+        request=request,
+        tenant_id=user.tenant_id,
+        actor_user_id=user.id,
+        target_type="inventory",
+        target_id=str(inventory_id),
+        details={"sku": sku, "name": name},
+    )
+    db.commit()
+    return {"message": "Product removed successfully", "id": str(inventory_id)}

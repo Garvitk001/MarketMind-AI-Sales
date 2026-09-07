@@ -83,3 +83,16 @@ class DeveloperOtpRequest(BaseModel):
 class DeveloperOtpVerify(BaseModel):
     otp: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
 
+
+class EmailOtpRequest(BaseModel):
+    email: EmailStr | None = None
+
+
+class EmailOtpVerify(BaseModel):
+    otp: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class EmailVerificationResponse(BaseModel):
+    message: str
+    email_verified: bool = True
+

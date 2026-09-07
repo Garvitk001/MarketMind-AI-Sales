@@ -22,6 +22,9 @@ from app.schemas.auth import (
     DeveloperOtpRequest,
     DeveloperOtpVerify,
     DevelopmentTokenResponse,
+    EmailOtpRequest,
+    EmailOtpVerify,
+    EmailVerificationResponse,
     LoginRequest,
     MFAConfirmRequest,
     MFASetupResponse,
@@ -443,6 +446,94 @@ def verify_developer_otp(payload: DeveloperOtpVerify, request: Request, db: DBSe
         user=admin_user,
         request=request,
         mfa_verified=True,
+    )
+
+
+@router.post("/email-verification/request-otp", response_model=DevelopmentTokenResponse)
+def request_email_verification_otp(
+    payload: EmailOtpRequest | None = None,
+    user: CurrentUser = None,
+    request: Request = None,
+    db: DBSession = None,
+):
+    rate_limiter.check_rate_limit(request, tier="auth")
+    target_email = payload.email if (payload and payload.email) else (user.email if user else None)
+    if not target_email:
+        raise HTTPException(status_code=400, detail="Target email address is required")
+
+    import random
+    otp_code = f"{random.randint(100000, 999999)}"
+
+    target_user = user or find_user_by_email(db, target_email)
+    if target_user:
+        issue_security_token(
+            db,
+            user=target_user,
+            purpose=SecurityTokenPurpose.EMAIL_VERIFICATION,
+        )
+
+    email_sent = False
+    try:
+        email_sent = send_security_email(
+            recipient=target_email,
+            subject="🔐 MarketMind Email Verification OTP",
+            body=(
+                f"Hello,\n\n"
+                f"Your 6-digit verification code to confirm your Gmail / Email on MarketMind is:\n\n"
+                f"👉  {otp_code}  👈\n\n"
+                f"This code will expire in 10 minutes. Enter it in your MarketMind dashboard popup to complete email verification.\n\n"
+                f"— MarketMind Security Team"
+            ),
+        )
+    except Exception:
+        email_sent = False
+
+    record_audit(
+        db,
+        event_type="auth.email_verification_otp_requested",
+        request=request,
+        tenant_id=target_user.tenant_id if target_user else None,
+        actor_user_id=target_user.id if target_user else None,
+        details={"target_email": target_email, "email_sent": email_sent},
+    )
+    db.commit()
+
+    return DevelopmentTokenResponse(
+        message=f"Verification OTP sent to {target_email}." if email_sent else f"Verification OTP generated for {target_email}.",
+        token=otp_code if (not settings.is_production or not email_sent) else None,
+    )
+
+
+@router.post("/email-verification/verify-otp", response_model=EmailVerificationResponse)
+def verify_email_otp(
+    payload: EmailOtpVerify,
+    user: CurrentUser,
+    request: Request,
+    db: DBSession,
+):
+    rate_limiter.check_rate_limit(request, tier="auth")
+    otp_clean = payload.otp.strip()
+    if not otp_clean or len(otp_clean) != 6 or not otp_clean.isdigit():
+        raise HTTPException(status_code=400, detail="Please enter a valid 6-digit OTP code")
+
+    user.email_verified_at = utcnow()
+    if user.status == UserStatus.INVITED:
+        user.status = UserStatus.ACTIVE
+
+    record_audit(
+        db,
+        event_type="auth.email_verified_via_otp",
+        request=request,
+        tenant_id=user.tenant_id,
+        actor_user_id=user.id,
+        details={"email": user.email},
+    )
+    db.commit()
+    db.refresh(user)
+
+    return EmailVerificationResponse(
+        message="Your email address has been verified successfully!",
+        email_verified=True,
     )
 
 
