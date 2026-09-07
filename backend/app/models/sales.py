@@ -55,11 +55,11 @@ class SalesTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     cgst_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     sgst_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     igst_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
-    payment_method: Mapped[str | None] = mapped_column(String(30), index=True)
-    payment_status: Mapped[str | None] = mapped_column(String(20), default="paid", index=True)
-    credit_terms: Mapped[str | None] = mapped_column(String(30), default="Net 30")
+    payment_method: Mapped[str | None] = mapped_column(String(60), index=True)
+    payment_status: Mapped[str | None] = mapped_column(String(30), default="paid", index=True)
+    credit_terms: Mapped[str | None] = mapped_column(String(50), default="Net 30")
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    hsn_code: Mapped[str | None] = mapped_column(String(20), default="8471")
+    hsn_code: Mapped[str | None] = mapped_column(String(30), default="8471")
     customer_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("customers.id", ondelete="SET NULL"), index=True
     )
