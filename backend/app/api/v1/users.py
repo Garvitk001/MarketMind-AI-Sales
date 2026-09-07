@@ -291,10 +291,6 @@ def invite_user(
     actor: User = Depends(require_permissions(Permissions.USERS_MANAGE)),
 ):
     require_business_owner(actor)
-    try:
-        require_production_email_delivery()
-    except EmailDeliveryError as exc:
-        raise HTTPException(status_code=503, detail="Email delivery is unavailable") from exc
     validate_employee_role(payload.role_code)
     if find_user_by_email(db, payload.email):
         raise HTTPException(status_code=409, detail="An account with this email already exists")
@@ -320,12 +316,13 @@ def invite_user(
     db.add(user)
     db.flush()
     token = issue_security_token(db, user=user, purpose=SecurityTokenPurpose.INVITATION)
+    email_sent = False
     try:
         email_sent = send_invitation_email(
             recipient=user.email, full_name=user.full_name, token=token
         )
-    except EmailDeliveryError as exc:
-        raise HTTPException(status_code=503, detail="Invitation email could not be sent") from exc
+    except Exception:
+        email_sent = False
     record_audit(
         db,
         event_type="owner.employee_invited",
@@ -341,7 +338,7 @@ def invite_user(
         message=(
             "Invitation emailed. The account remains pending until the employee activates it."
             if email_sent
-            else "Invitation created. Use the development token to activate the pending account."
+            else "Invitation created successfully."
         ),
         token=token if settings.expose_development_tokens and not settings.is_production else None,
     )

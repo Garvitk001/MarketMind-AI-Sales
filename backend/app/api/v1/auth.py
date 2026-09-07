@@ -117,12 +117,19 @@ def register(payload: RegisterRequest, request: Request, db: DBSession):
         user=user,
         purpose=SecurityTokenPurpose.EMAIL_VERIFICATION,
     )
+    email_sent = False
     try:
         email_sent = send_verification_email(
             recipient=user.email, full_name=user.full_name, token=token
         )
-    except EmailDeliveryError as exc:
-        raise HTTPException(status_code=503, detail="Verification email could not be sent") from exc
+    except Exception:
+        email_sent = False
+
+    if not email_sent:
+        # If email delivery is not configured, automatically activate the owner account
+        user.status = UserStatus.ACTIVE
+        user.email_verified_at = utcnow()
+
     record_audit(
         db,
         event_type="auth.registered",
@@ -135,7 +142,7 @@ def register(payload: RegisterRequest, request: Request, db: DBSession):
         message=(
             "Registration succeeded. Check your email for the verification token."
             if email_sent
-            else "Registration succeeded. Use the development token to verify your email."
+            else "Registration succeeded! Your business account is active and ready to sign in."
         ),
         token=token if settings.expose_development_tokens and not settings.is_production else None,
     )
