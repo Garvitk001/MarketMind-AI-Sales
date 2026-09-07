@@ -51,6 +51,25 @@ class Settings(BaseSettings):
     initial_admin_email: str | None = None
     initial_admin_password: SecretStr | None = None
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def sanitize_database_url(cls, value: str | None) -> str:
+        if not value:
+            return "sqlite:///./marketmind.db"
+        # Support postgres:// prefix by normalizing to postgresql:// for SQLAlchemy
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql://", 1)
+        return value
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: list[str] | str) -> list[str]:
+        if isinstance(value, str):
+            if value.strip() == "*":
+                return ["*"]
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
     @field_validator("jwt_secret")
     @classmethod
     def validate_jwt_secret(cls, value: SecretStr) -> SecretStr:
