@@ -12,8 +12,7 @@
 | Component | Platform | Direct Live Link |
 | :--- | :--- | :--- |
 | **Frontend Web Application** | **Vercel** | 🔗 **[https://marketmind-ai-sales.vercel.app](https://marketmind-ai-sales.vercel.app)** |
-| **Backend REST API** | **Render** | ⚙️ **[https://marketmind-backend.onrender.com/api/v1](https://marketmind-backend.onrender.com/api/v1)** |
-| **Interactive API Documentation** | **Swagger UI** | 📚 **[https://marketmind-backend.onrender.com/api/v1/docs](https://marketmind-backend.onrender.com/api/v1/docs)** |
+
 
 ---
 
