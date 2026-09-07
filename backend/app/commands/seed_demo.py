@@ -3,8 +3,10 @@ import json
 
 from sqlalchemy import select
 
+import app.models  # noqa: F401 - Register all models with Base.metadata
 from app.core.security import hash_password, utcnow
-from app.db.session import SessionLocal
+from app.db.base import Base
+from app.db.session import SessionLocal, engine
 from app.models.identity import Role, RoleCode, Store, Tenant, User, UserStatus
 from app.services.identity import seed_authorization
 
@@ -28,6 +30,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    # Create all database tables if they do not exist yet (e.g. fresh PostgreSQL instance)
+    Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         seed_authorization(db)
         tenant = db.scalar(select(Tenant).where(Tenant.slug == args.tenant))
