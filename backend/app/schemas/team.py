@@ -83,3 +83,28 @@ class TeamOverviewResponse(BaseModel):
     below_target: int
     top_performer: EmployeePerformanceResponse | None
     employees: list[EmployeePerformanceResponse]
+
+
+class EmployeeActivityItem(BaseModel):
+    id: str
+    event_type: str
+    action_title: str
+    description: str
+    category: str  # "sales" | "inventory" | "billing" | "security" | "team"
+    target_type: str | None = None
+    target_id: str | None = None
+    occurred_at: datetime
+    badge_variant: str = "info"  # "success" | "warning" | "info" | "danger"
+    amount: Decimal | None = None
+    details: dict = Field(default_factory=dict)
+
+
+class EmployeeActivityLogResponse(BaseModel):
+    employee_id: UUID
+    full_name: str
+    role_code: str
+    role_name: str
+    days: int
+    total_events: int
+    activities: list[EmployeeActivityItem]
+

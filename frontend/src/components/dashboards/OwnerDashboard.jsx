@@ -34,7 +34,11 @@ import {
   LayoutGrid,
   List,
   Store,
-  ShoppingBag
+  ShoppingBag,
+  History,
+  FileText,
+  Package,
+  CheckCircle
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -96,6 +100,8 @@ export const OwnerDashboard = ({ onNavigate }) => {
   const [loadingTeam, setLoadingTeam] = useState(false);
   const [execSearch, setExecSearch] = useState('');
   const [selectedExec, setSelectedExec] = useState(null);
+  const [execLogs, setExecLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
 
   useEffect(() => {
@@ -112,6 +118,25 @@ export const OwnerDashboard = ({ onNavigate }) => {
         setLoadingTeam(false);
       });
   }, [api, execTimeframe]);
+
+  useEffect(() => {
+    if (!selectedExec?.employee_id) {
+      setExecLogs([]);
+      return;
+    }
+    setLoadingLogs(true);
+    api(`/team/employees/${selectedExec.employee_id}/activity-logs?days=60`)
+      .then((res) => {
+        setExecLogs(res?.activities || []);
+      })
+      .catch((err) => {
+        console.error('Failed to load employee activity history:', err);
+        setExecLogs([]);
+      })
+      .finally(() => {
+        setLoadingLogs(false);
+      });
+  }, [api, selectedExec]);
 
   const salesExecList = useMemo(() => {
     const list = teamData?.employees || [];
@@ -170,26 +195,34 @@ export const OwnerDashboard = ({ onNavigate }) => {
       label: t('Outstanding Credit Receivables'),
       value: money(outstandingCredit),
       change: outstandingCredit > 0 ? 'Active Credit Terms' : '0 Overdue Invoices',
-      timeFrame: 'Net 30 terms'
+      timeFrame: 'Net 7–15 terms'
     }
   };
 
   const revenueTrend = (salesDashboard?.trend || []).length
-    ? salesDashboard.trend.map((point) => ({ name: point.date, revenue: point.revenue }))
+    ? salesDashboard.trend.map((point) => ({
+        date: point.date,
+        name: point.date,
+        revenue: Number(point.revenue || 0)
+      }))
     : hasBusinessData
-      ? MOCK_OWNER_DATA.revenueTrend
+      ? (MOCK_OWNER_DATA.revenueTrend || []).map((point) => ({
+          date: point.date || point.name,
+          name: point.date || point.name,
+          revenue: Number(point.revenue || 0)
+        }))
       : [];
 
   const creditAgingData = outstandingCredit > 0
     ? [
-        { period: '0–30 Days', amount: Math.round(outstandingCredit * 0.55), color: '#10b981' },
-        { period: '31–60 Days', amount: Math.round(outstandingCredit * 0.30), color: '#f59e0b' },
-        { period: '60+ Days (Overdue)', amount: Math.round(outstandingCredit * 0.15), color: '#ef4444' }
+        { period: '0–7 Days', amount: Math.round(outstandingCredit * 0.50), color: '#10b981' },
+        { period: '8–15 Days', amount: Math.round(outstandingCredit * 0.30), color: '#f59e0b' },
+        { period: '15+ Days (Overdue)', amount: Math.round(outstandingCredit * 0.20), color: '#ef4444' }
       ]
     : [
-        { period: '0–30 Days', amount: 0, color: '#10b981' },
-        { period: '31–60 Days', amount: 0, color: '#f59e0b' },
-        { period: '60+ Days (Overdue)', amount: 0, color: '#ef4444' }
+        { period: '0–7 Days', amount: 0, color: '#10b981' },
+        { period: '8–15 Days', amount: 0, color: '#f59e0b' },
+        { period: '15+ Days (Overdue)', amount: 0, color: '#ef4444' }
       ];
 
   return (
@@ -391,8 +424,8 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 <span className="font-bold text-slate-200">{money(outstandingCredit)}</span>
               </div>
               <div className="flex justify-between items-center text-rose-400 font-semibold">
-                <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Overdue (60+ Days):</span>
-                <span>{money(Math.round(outstandingCredit * 0.15))}</span>
+                <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Overdue (15+ Days):</span>
+                <span>{money(Math.round(outstandingCredit * 0.20))}</span>
               </div>
             </div>
           </div>
@@ -818,6 +851,85 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 </ul>
               </div>
             )}
+
+            {/* 60-Day Employee Task & Activity History */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 uppercase tracking-wider">
+                  <History className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>60-Day Task &amp; Activity Audit Log</span>
+                </h4>
+                <Badge variant="neutral" size="sm">Past 60 Days</Badge>
+              </div>
+
+              {loadingLogs ? (
+                <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+                  <span>Loading recent 60-day employee task history...</span>
+                </div>
+              ) : execLogs.length === 0 ? (
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-850 dark:bg-[#121826] border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
+                  No logged tasks, bills, or inventory actions found for this staff member in the last 60 days.
+                </div>
+              ) : (
+                <div className="max-h-56 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {execLogs.map((log) => {
+                    const isBilling = log.category === 'billing' || log.category === 'sales';
+                    const isInventory = log.category === 'inventory';
+                    return (
+                      <div
+                        key={log.id}
+                        className="p-3 rounded-xl bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 flex items-start justify-between gap-3 text-xs hover:border-indigo-400 dark:hover:border-indigo-600 transition"
+                      >
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <div
+                            className={`p-2 rounded-lg mt-0.5 shrink-0 ${
+                              isBilling
+                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                                : isInventory
+                                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
+                                : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400'
+                            }`}
+                          >
+                            {isBilling ? (
+                              <FileText className="w-3.5 h-3.5" />
+                            ) : isInventory ? (
+                              <Package className="w-3.5 h-3.5" />
+                            ) : (
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{log.action_title}</p>
+                              <Badge variant={log.badge_variant || 'info'} size="sm">
+                                {log.category}
+                              </Badge>
+                            </div>
+                            <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">{log.description}</p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {new Date(log.occurred_at).toLocaleString('en-IN', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                        </div>
+
+                        {log.amount !== null && log.amount !== undefined && (
+                          <span className="font-bold text-slate-900 dark:text-slate-100 text-xs shrink-0">
+                            {money(log.amount)}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-800">
               <Button variant="outline" onClick={() => setSelectedExec(null)}>

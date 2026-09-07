@@ -19,6 +19,10 @@ import {
   CheckCircle2,
   Edit,
   UserCog,
+  History,
+  FileText,
+  Package,
+  Clock,
 } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
@@ -787,6 +791,35 @@ const PerformanceDetail = ({
   setAssignment,
   addToast,
 }) => {
+  const { api } = useAuth();
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logCategory, setLogCategory] = useState('all');
+
+  useEffect(() => {
+    if (!employee?.employee_id) return;
+    setLoadingLogs(true);
+    api(`/team/employees/${employee.employee_id}/activity-logs?days=60`)
+      .then((res) => {
+        setActivityLogs(res?.activities || []);
+      })
+      .catch((err) => {
+        console.error('Failed to load employee activity logs:', err);
+        setActivityLogs([]);
+      })
+      .finally(() => {
+        setLoadingLogs(false);
+      });
+  }, [api, employee?.employee_id]);
+
+  const filteredLogs = useMemo(() => {
+    if (logCategory === 'all') return activityLogs;
+    if (logCategory === 'billing') {
+      return activityLogs.filter((l) => l.category === 'billing' || l.category === 'sales');
+    }
+    return activityLogs.filter((l) => l.category === logCategory);
+  }, [activityLogs, logCategory]);
+
   const handleDownloadBrief = () => {
     const csvContent =
       `EMPLOYEE PERFORMANCE & AI EVALUATION BRIEF\n` +
@@ -891,6 +924,114 @@ const PerformanceDetail = ({
           </div>
         </Card>
       )}
+
+      {/* 60-Day Employee Task & Activity History */}
+      <Card hoverEffect={false} className="p-4 space-y-3 bg-slate-50/50 dark:bg-slate-850/40 border-slate-200 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4 text-indigo-500" />
+              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                60-Day Task &amp; Action Audit History
+              </h4>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Chronological log of bills generated, marked paid, products added/edited/deleted, and inventory adjustments.
+            </p>
+          </div>
+
+          {/* Category Filter Chips */}
+          <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-slate-800 p-1 rounded-xl">
+            {[
+              { id: 'all', label: 'All Tasks' },
+              { id: 'billing', label: 'Billing & Payments' },
+              { id: 'inventory', label: 'Inventory & Stock' },
+              { id: 'security', label: 'Logins & Auth' },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setLogCategory(cat.id)}
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition ${
+                  logCategory === cat.id
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loadingLogs ? (
+          <div className="p-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+            <span className="w-3.5 h-3.5 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+            <span>Fetching 60-day activity logs from audit engine...</span>
+          </div>
+        ) : filteredLogs.length === 0 ? (
+          <div className="p-6 text-center text-xs text-slate-400 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800">
+            No logged tasks found in the selected category for the past 60 days.
+          </div>
+        ) : (
+          <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+            {filteredLogs.map((log) => {
+              const isBilling = log.category === 'billing' || log.category === 'sales';
+              const isInventory = log.category === 'inventory';
+              return (
+                <div
+                  key={log.id}
+                  className="p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 flex items-start justify-between gap-3 text-xs hover:border-indigo-400 dark:hover:border-indigo-600 transition"
+                >
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <div
+                      className={`p-2 rounded-lg mt-0.5 shrink-0 ${
+                        isBilling
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                          : isInventory
+                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
+                          : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400'
+                      }`}
+                    >
+                      {isBilling ? (
+                        <FileText className="w-3.5 h-3.5" />
+                      ) : isInventory ? (
+                        <Package className="w-3.5 h-3.5" />
+                      ) : (
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{log.action_title}</p>
+                        <Badge variant={log.badge_variant || 'info'} size="sm">
+                          {log.category}
+                        </Badge>
+                      </div>
+                      <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">{log.description}</p>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {new Date(log.occurred_at).toLocaleString('en-IN', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {log.amount !== null && log.amount !== undefined && (
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-xs shrink-0">
+                      {money(log.amount)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
 
       <div className="grid lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3 h-60 rounded-2xl border border-slate-200 dark:border-slate-800 p-3">

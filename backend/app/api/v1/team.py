@@ -10,11 +10,14 @@ from sqlalchemy.orm import selectinload
 from app.api.dependencies import DBSession, require_permissions, require_reauthentication
 from app.core.permissions import Permissions
 from app.core.security import utcnow
+from app.models.audit import AuditEvent
 from app.models.customers import Customer
 from app.models.identity import Role, RoleCode, User, UserStatus
 from app.models.performance import EmployeeTarget
 from app.models.sales import SalesTransaction, TransactionStatus
 from app.schemas.team import (
+    EmployeeActivityItem,
+    EmployeeActivityLogResponse,
     EmployeePerformanceResponse,
     PerformanceMetrics,
     TargetCreate,
@@ -361,3 +364,162 @@ def set_employee_target(
     )
     db.commit()
     return build_performance(db, employee, payload.period_start, payload.period_end)
+
+
+@router.get(
+    "/employees/{employee_id}/activity-logs",
+    response_model=EmployeeActivityLogResponse,
+)
+def get_employee_activity_logs(
+    employee_id: UUID,
+    db: DBSession,
+    actor: User = Depends(team_reader),
+    days: int = Query(default=60, ge=1, le=180),
+):
+    employee = next((item for item in visible_employees(db, actor) if item.id == employee_id), None)
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found in your permitted scope")
+
+    cutoff = utcnow() - timedelta(days=days)
+
+    # 1. Fetch Audit Events performed by this employee
+    audit_rows = db.scalars(
+        select(AuditEvent)
+        .where(
+            AuditEvent.tenant_id == actor.tenant_id,
+            AuditEvent.actor_user_id == employee.id,
+            AuditEvent.created_at >= cutoff,
+        )
+        .order_by(AuditEvent.created_at.desc())
+        .limit(100)
+    ).all()
+
+    # 2. Fetch Sales Transactions created by this seller
+    tx_rows = db.scalars(
+        select(SalesTransaction)
+        .where(
+            SalesTransaction.tenant_id == actor.tenant_id,
+            SalesTransaction.seller_id == employee.id,
+            SalesTransaction.occurred_at >= cutoff,
+        )
+        .order_by(SalesTransaction.occurred_at.desc())
+        .limit(100)
+    ).all()
+
+    activities: list[EmployeeActivityItem] = []
+    seen_ids = set()
+
+    for ev in audit_rows:
+        seen_ids.add(str(ev.id))
+        ev_type = ev.event_type
+        details = ev.details or {}
+        action_title = "User Activity Recorded"
+        description = f"Performed action: {ev_type}"
+        category = "security"
+        badge_variant = "info"
+        amount = None
+
+        if ev_type == "sales.transaction_created":
+            action_title = "Generated B2B Bill / Invoice"
+            amount_str = details.get("amount")
+            amount = Decimal(str(amount_str)) if amount_str else None
+            description = f"Generated invoice (Ref: {ev.target_id or 'New Sale'})"
+            if amount:
+                description += f" for ₹{amount:,.2f}"
+            category = "billing"
+            badge_variant = "success"
+        elif ev_type == "sales.transaction_updated":
+            action_title = "Updated Bill / Marked Paid"
+            category = "billing"
+            badge_variant = "info"
+            description = "Updated invoice status / recorded payment terms"
+        elif ev_type == "sales.transaction_voided":
+            action_title = "Voided Sales Transaction"
+            category = "billing"
+            badge_variant = "danger"
+            description = f"Voided and cancelled transaction record {ev.target_id or ''}"
+        elif ev_type == "inventory.created":
+            action_title = "Added Product / Inward Stock"
+            sku = details.get("sku", "Product")
+            name = details.get("name", "")
+            description = f"Added product '{name}' (SKU: {sku}) to store inventory"
+            category = "inventory"
+            badge_variant = "success"
+        elif ev_type == "inventory.updated":
+            action_title = "Updated Inventory & Stock Levels"
+            description = "Modified warehouse inventory quantities and parameters"
+            category = "inventory"
+            badge_variant = "info"
+        elif ev_type == "inventory.deleted":
+            action_title = "Deleted Product from Catalog"
+            sku = details.get("sku", "")
+            name = details.get("name", "")
+            description = f"Removed product '{name}' (SKU: {sku}) from inventory"
+            category = "inventory"
+            badge_variant = "warning"
+        elif ev_type == "auth.login":
+            action_title = "Employee Login Session"
+            description = "Authenticated to MarketMind commercial session"
+            category = "security"
+            badge_variant = "info"
+        elif "target" in ev_type:
+            action_title = "Sales Quota Target Event"
+            description = "Updated sales performance target"
+            category = "team"
+            badge_variant = "info"
+
+        activities.append(
+            EmployeeActivityItem(
+                id=str(ev.id),
+                event_type=ev_type,
+                action_title=action_title,
+                description=description,
+                category=category,
+                target_type=ev.target_type,
+                target_id=ev.target_id,
+                occurred_at=ev.created_at,
+                badge_variant=badge_variant,
+                amount=amount,
+                details=details,
+            )
+        )
+
+    # Supplement with sales transactions if audit rows don't already cover them
+    for tx in tx_rows:
+        tx_id_str = f"tx-{tx.id}"
+        if tx_id_str not in seen_ids and str(tx.id) not in seen_ids:
+            seen_ids.add(tx_id_str)
+            status_label = "Paid" if tx.payment_status == "paid" else "Unpaid / Credit"
+            activities.append(
+                EmployeeActivityItem(
+                    id=tx_id_str,
+                    event_type="sales.bill_recorded",
+                    action_title=f"B2B Invoice {tx.external_reference or 'Generated'}",
+                    description=f"Generated bill for ₹{tx.total_amount:,.2f} ({tx.item_count} items, Status: {status_label})",
+                    category="billing",
+                    target_type="sales_transaction",
+                    target_id=str(tx.id),
+                    occurred_at=tx.occurred_at,
+                    badge_variant="success" if tx.payment_status == "paid" else "warning",
+                    amount=tx.total_amount,
+                    details={
+                        "payment_status": tx.payment_status or "paid",
+                        "external_reference": tx.external_reference,
+                        "item_count": tx.item_count,
+                    },
+                )
+            )
+
+    # Sort all activities chronologically descending
+    activities.sort(key=lambda x: x.occurred_at, reverse=True)
+
+    return EmployeeActivityLogResponse(
+        employee_id=employee.id,
+        full_name=employee.full_name,
+        role_code=employee.role.code,
+        role_name=employee.role.name,
+        days=days,
+        total_events=len(activities),
+        activities=activities,
+    )
+
