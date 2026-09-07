@@ -1,7 +1,6 @@
 # 🚀 MarketMind AI — Enterprise Sales Intelligence & Business Copilot Platform
 
 [![Live Frontend App](https://img.shields.io/badge/Live%20Frontend-Vercel%20Application-success?style=for-the-badge&logo=vercel)](https://marketmind-ai-sales.vercel.app)
-[![Backend API Docs](https://img.shields.io/badge/Backend%20API-Render%20Swagger-blue?style=for-the-badge&logo=fastapi)](https://marketmind-backend.onrender.com/api/v1/docs)
 [![Database](https://img.shields.io/badge/Cloud%20Database-Neon%20PostgreSQL-336791?style=for-the-badge&logo=postgresql)](https://neon.tech)
 [![Python Version](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python)](https://python.org)
 [![React Version](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://react.dev)
