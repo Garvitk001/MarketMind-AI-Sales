@@ -265,9 +265,9 @@ def request_password_reset(payload: PasswordResetRequest, request: Request, db: 
         db.commit()
     return DevelopmentTokenResponse(
         message=(
-            "If the account exists, password reset instructions have been sent by email."
+            "If the account exists, a 6-digit password reset OTP has been sent by email."
             if email_delivery_configured()
-            else "If the account exists, a development reset token has been issued."
+            else "If the account exists, a 6-digit password reset OTP has been issued."
         ),
         token=(
             raw_token

@@ -31,8 +31,13 @@ def issue_security_token(
     *,
     user: User,
     purpose: SecurityTokenPurpose,
+    is_otp: bool = False,
 ) -> str:
-    raw_token = random_token()
+    import random
+    if is_otp or purpose == SecurityTokenPurpose.PASSWORD_RESET:
+        raw_token = f"{random.randint(100000, 999999)}"
+    else:
+        raw_token = random_token()
     security_token = SecurityToken(
         user_id=user.id,
         purpose=purpose.value,

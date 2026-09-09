@@ -222,16 +222,16 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
         const response = await requestPasswordReset(forgotEmail.trim());
         setResetToken(response.token || '');
         setIsResetRequested(true);
-        addToast(response.message, 'info');
+        addToast(response.message || '6-digit OTP sent to your email.', 'info');
       } else {
-        if (!resetToken.trim()) throw new Error('Enter the reset token sent to your email.');
+        if (!resetToken.trim()) throw new Error('Enter the 6-digit OTP code sent to your email.');
         const invalidPassword = passwordError(resetPassword);
         if (invalidPassword) throw new Error(invalidPassword);
         const response = await confirmPasswordReset({
-          token: resetToken,
+          token: resetToken.trim(),
           newPassword: resetPassword
         });
-        addToast(response.message, 'success');
+        addToast(response.message || 'Password updated successfully. You can now log in.', 'success');
         setIsForgotModalOpen(false);
         setForgotEmail('');
         setIsResetRequested(false);
@@ -694,27 +694,30 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
         <form onSubmit={handleForgotSubmit} className="space-y-4">
           <p className="text-sm text-slate-600 dark:text-slate-300">
             {isResetRequested
-              ? 'Check your email, enter the one-time reset token, and choose a new password. Local development fills the token automatically.'
-              : 'Enter your work email. If the account exists, MarketMind will send password-reset instructions to that address.'}
+              ? 'Check your email inbox, enter the 6-digit OTP passcode, and choose your new account password.'
+              : 'Enter your registered email address. MarketMind will deliver a 6-digit password-reset OTP to your inbox.'}
           </p>
           <Input
             id="forgotEmail"
-            label="Email Address"
+            label="Registered Email Address"
             type="email"
             placeholder="name@company.com"
             value={forgotEmail}
             onChange={(e) => setForgotEmail(e.target.value)}
             icon={Mail}
+            disabled={isResetRequested}
             required
           />
           {isResetRequested && (
             <>
               <Input
                 id="resetToken"
-                label="Reset Token"
+                label="6-Digit Security OTP"
+                placeholder="Enter 6-digit OTP code"
                 value={resetToken}
                 onChange={(e) => setResetToken(e.target.value)}
                 icon={CheckCircle2}
+                maxLength={6}
                 required
               />
               <Input
@@ -743,7 +746,7 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
               Cancel
             </Button>
             <Button type="submit" variant="primary" isLoading={forgotSubmitted}>
-              {isResetRequested ? 'Set New Password' : 'Email Reset Instructions'}
+              {isResetRequested ? 'Confirm New Password' : 'Send 6-Digit OTP Code'}
             </Button>
           </div>
         </form>

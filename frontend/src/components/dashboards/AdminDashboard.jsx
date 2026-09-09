@@ -564,35 +564,35 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
   }, [permissions, rbacSearch]);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
       {/* Platform Command Center Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-purple-950 to-slate-900 border border-purple-800/40 p-6 md:p-8 text-white shadow-2xl">
-        <div className="absolute -right-16 -top-16 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 border border-slate-800/80 p-6 md:p-8 text-white shadow-2xl">
+        <div className="absolute -right-16 -top-16 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute right-32 -bottom-20 w-48 h-48 bg-emerald-600/10 rounded-full blur-2xl pointer-events-none" />
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-xs font-mono font-semibold text-purple-300">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-400/30 text-xs font-semibold text-indigo-300">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              RESTRICTED SYSTEM ROOT • PLATFORM ADMIN CONSOLE
+              <span>RESTRICTED SYSTEM ROOT • PLATFORM ADMIN CONSOLE</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-purple-200 bg-clip-text text-transparent">
-              Platform Governance & Diagnostics
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
+              Platform Governance &amp; Diagnostics
             </h1>
             <p className="text-xs md:text-sm text-slate-400 max-w-2xl leading-relaxed">
-              Multi-tenant Business Owners directory with contact records, authentication timing logs, AI retrain telemetry, and automated error diagnostics.
+              Real-time platform governance, business tenant directories, authentication audit logs, AI retrain pipelines, and error diagnostics.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <Button
               variant="outline"
               size="sm"
               onClick={loadPlatformData}
               icon={RefreshCw}
-              className="border-purple-500/40 bg-purple-950/40 hover:bg-purple-900/60 text-purple-200 text-xs font-semibold"
+              className="border-slate-700 bg-slate-900/60 hover:bg-slate-800 text-slate-200 text-xs font-semibold"
             >
-              Refresh Telemetry
+              Refresh Data
             </Button>
             <Button
               variant="primary"
@@ -600,9 +600,9 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
               onClick={() => handleRetrainAllForBusiness('all')}
               isLoading={retrainingModel === 'all'}
               icon={Zap}
-              className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-lg shadow-purple-600/30"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30"
             >
-              Retrain All Platform AI
+              Retrain All AI Models
             </Button>
           </div>
         </div>
@@ -610,111 +610,119 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
 
       {/* Platform Level Metric Counters */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-slate-800 bg-slate-900/80 backdrop-blur">
+        <Card className="border-slate-800/80 bg-slate-900/80 backdrop-blur-md shadow-lg hover:border-slate-700 transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Business Owners</span>
-            <Building2 className="w-4 h-4 text-purple-400" />
+            <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <Building2 className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-white">{businesses.length} Owners</span>
-            <span className="text-xs text-emerald-400 font-semibold font-mono">100% Active</span>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{businesses.length} Owners</span>
+            <span className="text-xs text-emerald-400 font-semibold px-2 py-0.5 rounded bg-emerald-500/10">100% Active</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">{totalStoresAcrossPlatform} Stores • {totalEmployeesAcrossPlatform} Employees</p>
+          <p className="text-[11px] text-slate-400 mt-1.5 font-medium">{totalStoresAcrossPlatform} Stores • {totalEmployeesAcrossPlatform} Employees</p>
         </Card>
 
-        <Card className="border-slate-800 bg-slate-900/80 backdrop-blur">
+        <Card className="border-slate-800/80 bg-slate-900/80 backdrop-blur-md shadow-lg hover:border-slate-700 transition">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Auth & Login Stream</span>
-            <Clock className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Auth &amp; Login Stream</span>
+            <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+              <Clock className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-white">{logs.length}</span>
-            <span className="text-xs text-slate-400 font-mono">Recorded</span>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-white tabular-nums tracking-tight">{logs.length}</span>
+            <span className="text-xs text-slate-400">Events Recorded</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">Exact Timestamps & Email Tracking</p>
+          <p className="text-[11px] text-slate-400 mt-1.5 font-medium">Exact Timestamps &amp; Email Tracking</p>
         </Card>
 
-        <Card className="border-slate-800 bg-slate-900/80 backdrop-blur">
+        <Card className="border-slate-800/80 bg-slate-900/80 backdrop-blur-md shadow-lg hover:border-slate-700 transition">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">AI Retrain Schedules</span>
-            <Brain className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">AI Retrain Engines</span>
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <Brain className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-emerald-400">5 Models / Biz</span>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-emerald-400 tabular-nums tracking-tight">5 Engines / Biz</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">Forecast • Seg • Recs • Churn • Anomaly</p>
+          <p className="text-[11px] text-slate-400 mt-1.5 font-medium">Forecast • Seg • Recs • Churn • Safeguards</p>
         </Card>
 
-        <Card className="border-slate-800 bg-slate-900/80 backdrop-blur">
+        <Card className="border-slate-800/80 bg-slate-900/80 backdrop-blur-md shadow-lg hover:border-slate-700 transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Error Diagnostics</span>
-            <AlertOctagon className="w-4 h-4 text-rose-400" />
+            <div className="w-7 h-7 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+              <AlertOctagon className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-rose-300">
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-rose-400 tabular-nums tracking-tight">
               {systemErrors.filter((e) => e.status !== 'RESOLVED').length} Active
             </span>
-            <span className="text-xs text-slate-400 font-mono">({systemErrors.length} total)</span>
+            <span className="text-xs text-slate-400">({systemErrors.length} total)</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">Exceptions & Stack Trace Monitor</p>
+          <p className="text-[11px] text-slate-400 mt-1.5 font-medium">Live Stack Traces &amp; Alert Stream</p>
         </Card>
       </div>
 
       {/* Horizontal Top Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2 overflow-x-auto">
         <button
           type="button"
           onClick={() => handleTabSelect('businesses')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
             currentTab === 'businesses'
-              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-bold'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
           <Building2 className="w-4 h-4" />
-          Business Owners & Teams
-          <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-purple-900/80 text-purple-200">{businesses.length}</span>
+          <span>Business Owners &amp; Teams</span>
+          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-900/80 text-indigo-200">{businesses.length}</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleTabSelect('auth_logs')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
             currentTab === 'auth_logs'
-              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-bold'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
           <Clock className="w-4 h-4" />
-          Authentication & Login Timings
-          <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-slate-800 text-slate-300">{filteredLogs.length}</span>
+          <span>Authentication &amp; Login Timings</span>
+          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-slate-300">{filteredLogs.length}</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleTabSelect('ai_models')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
             currentTab === 'ai_models'
-              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-bold'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
           <Cpu className="w-4 h-4" />
-          AI Models & Retrain Schedules
+          <span>AI Models &amp; Retrain Schedules</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleTabSelect('errors')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
             currentTab === 'errors'
-              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-bold'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
           <AlertTriangle className="w-4 h-4" />
-          Error Handling & Diagnostics
-          <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-rose-900/80 text-rose-200">
+          <span>Error Handling &amp; Diagnostics</span>
+          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-900/80 text-rose-200">
             {systemErrors.filter((e) => e.status !== 'RESOLVED').length}
           </span>
         </button>
@@ -722,38 +730,38 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
         <button
           type="button"
           onClick={() => handleTabSelect('system')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
             currentTab === 'system'
-              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-bold'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
           <Database className="w-4 h-4" />
-          System Health & RBAC
+          <span>System Health &amp; RBAC</span>
         </button>
       </div>
 
       {/* TAB 1: Business Owners & Their Employees Directory */}
       {currentTab === 'businesses' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4">
+        <div className="space-y-4 font-sans">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/80 border border-slate-800/80 rounded-2xl p-5 shadow-lg backdrop-blur-md">
             <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-purple-400" />
-                Multi-Tenant Business Owners & Complete Staff Directory
+              <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-indigo-400" />
+                Multi-Tenant Business Owners &amp; Complete Staff Directory
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Displays total Business Owners ({businesses.length}), direct contact records (email, phone, business name), and all registered employees.
+              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                Displays total Business Owners ({businesses.length}), verified contact profiles (email, phone, business name), and all registered staff records.
               </p>
             </div>
-            <div className="relative w-full sm:w-72">
-              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search by name, email, phone, business..."
                 value={businessSearchQuery}
                 onChange={(e) => setBusinessSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500"
+                className="w-full pl-9 pr-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition shadow-inner"
               />
             </div>
           </div>
@@ -762,52 +770,54 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
             {filteredBusinesses.map((biz) => {
               const isExpanded = expandedBusinessId === biz.id;
               return (
-                <Card key={biz.id} className="border-slate-800 bg-slate-900/80 overflow-hidden">
+                <Card key={biz.id} className="border-slate-800/80 bg-slate-900/80 overflow-hidden shadow-xl hover:border-slate-700/80 transition">
                   <div
                     onClick={() => setExpandedBusinessId(isExpanded ? null : biz.id)}
                     className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-slate-800/40 transition"
                   >
-                    <div className="flex items-start gap-3.5">
-                      <div className="w-11 h-11 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-600/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 shadow-md">
                         <Building2 className="w-5 h-5" />
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-bold text-white text-base">{biz.name}</h4>
-                          <Badge variant="success" className="text-[10px] px-1.5 py-0">{biz.status}</Badge>
-                          <span className="text-xs text-slate-500 font-mono">ID: {biz.id}</span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300 font-mono">
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3 h-3 text-purple-400" />
-                            Owner: <strong className="text-white">{biz.ownerName}</strong>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h4 className="font-bold text-white text-base tracking-tight">{biz.name}</h4>
+                          <Badge variant="success" className="text-[10px] px-2 py-0.5 font-semibold uppercase">{biz.status}</Badge>
+                          <span className="text-xs text-slate-400 font-mono bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
+                            ID: {biz.id}
                           </span>
-                          <span className="flex items-center gap-1 text-purple-300">
-                            <Mail className="w-3 h-3 text-purple-400" />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-300">
+                          <span className="flex items-center gap-1.5 font-medium">
+                            <Users className="w-3.5 h-3.5 text-indigo-400" />
+                            Owner: <strong className="text-white font-semibold">{biz.ownerName}</strong>
+                          </span>
+                          <span className="flex items-center gap-1.5 text-indigo-300 font-medium">
+                            <Mail className="w-3.5 h-3.5 text-indigo-400" />
                             {biz.ownerEmail}
                           </span>
-                          <span className="flex items-center gap-1 text-emerald-300 font-bold">
-                            <Phone className="w-3 h-3 text-emerald-400" />
+                          <span className="flex items-center gap-1.5 text-emerald-300 font-semibold">
+                            <Phone className="w-3.5 h-3.5 text-emerald-400" />
                             {biz.ownerPhone}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-300">
-                      <div className="px-3 py-1.5 rounded-lg bg-slate-950/80 border border-slate-800">
-                        <span className="text-slate-500 block text-[10px] uppercase">Active Stores</span>
-                        <span className="font-bold text-white">{biz.storesCount} Stores</span>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300">
+                      <div className="px-3.5 py-2 rounded-xl bg-slate-950/80 border border-slate-800/80">
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Active Stores</span>
+                        <span className="font-bold text-white tabular-nums">{biz.storesCount} Stores</span>
                       </div>
-                      <div className="px-3 py-1.5 rounded-lg bg-slate-950/80 border border-slate-800">
-                        <span className="text-slate-500 block text-[10px] uppercase">Registered Staff</span>
-                        <span className="font-bold text-purple-300">{biz.employees.length} Employees</span>
+                      <div className="px-3.5 py-2 rounded-xl bg-slate-950/80 border border-slate-800/80">
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Registered Staff</span>
+                        <span className="font-bold text-indigo-300 tabular-nums">{biz.employees.length} Employees</span>
                       </div>
-                      <div className="px-3 py-1.5 rounded-lg bg-slate-950/80 border border-slate-800">
-                        <span className="text-slate-500 block text-[10px] uppercase">Joined Date</span>
-                        <span className="text-slate-300">{biz.joinedDate}</span>
+                      <div className="px-3.5 py-2 rounded-xl bg-slate-950/80 border border-slate-800/80">
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Joined Date</span>
+                        <span className="text-slate-300 font-medium">{biz.joinedDate}</span>
                       </div>
-                      <div className="p-1 rounded-lg bg-slate-800 text-slate-400">
+                      <div className="p-2 rounded-xl bg-slate-800 border border-slate-700/60 text-slate-400 hover:text-white transition">
                         {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       </div>
                     </div>
@@ -815,65 +825,65 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
 
                   {/* Expanded Employees Section */}
                   {isExpanded && (
-                    <div className="border-t border-slate-800 bg-slate-950/60 p-5 space-y-3 animate-fade-in">
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-800/60">
-                        <h5 className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                    <div className="border-t border-slate-800/80 bg-slate-950/60 p-5 space-y-3 animate-fade-in">
+                      <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
+                        <h5 className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5" />
-                          Affiliated Employees under {biz.name} ({biz.employees.length} Staff)
+                          Affiliated Employees under {biz.name} ({biz.employees.length} Staff Members)
                         </h5>
-                        <span className="text-[11px] text-slate-500 font-mono">
+                        <span className="text-[11px] text-slate-400 font-medium">
                           Owner Contact: {biz.ownerPhone} • {biz.ownerEmail}
                         </span>
                       </div>
 
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs font-mono">
-                          <thead className="text-[11px] uppercase text-slate-500 border-b border-slate-800/80">
+                      <div className="overflow-x-auto rounded-xl border border-slate-800/80">
+                        <table className="w-full text-left text-xs">
+                          <thead className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 border-b border-slate-800/80 bg-slate-900/90">
                             <tr>
-                              <th className="py-2.5 px-3">Employee Name</th>
-                              <th className="py-2.5 px-3">Email Address</th>
-                              <th className="py-2.5 px-3">Phone Number</th>
-                              <th className="py-2.5 px-3">Role</th>
-                              <th className="py-2.5 px-3">Assigned Store</th>
-                              <th className="py-2.5 px-3">Status</th>
-                              <th className="py-2.5 px-3 text-right">Last Active</th>
+                              <th className="py-3 px-3.5">Employee Name</th>
+                              <th className="py-3 px-3.5">Email Address</th>
+                              <th className="py-3 px-3.5">Phone Number</th>
+                              <th className="py-3 px-3.5">Role</th>
+                              <th className="py-3 px-3.5">Assigned Store</th>
+                              <th className="py-3 px-3.5">Status</th>
+                              <th className="py-3 px-3.5 text-right">Last Active</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-800/40">
+                          <tbody className="divide-y divide-slate-800/50 bg-slate-950/40">
                             {biz.employees.map((emp) => (
-                              <tr key={emp.id} className="hover:bg-slate-800/20 transition">
-                                <td className="py-3 px-3 font-semibold text-white flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-purple-950 border border-purple-500/30 flex items-center justify-center text-[10px] text-purple-300 font-bold">
+                              <tr key={emp.id} className="hover:bg-slate-800/30 transition">
+                                <td className="py-3 px-3.5 font-semibold text-white flex items-center gap-2.5">
+                                  <div className="w-7 h-7 rounded-full bg-indigo-950 border border-indigo-500/30 flex items-center justify-center text-[11px] text-indigo-300 font-bold">
                                     {emp.name.slice(0, 2).toUpperCase()}
                                   </div>
-                                  {emp.name}
+                                  <span className="font-semibold">{emp.name}</span>
                                 </td>
-                                <td className="py-3 px-3 text-purple-300">{emp.email}</td>
-                                <td className="py-3 px-3 text-emerald-300 font-semibold">{emp.phone}</td>
-                                <td className="py-3 px-3">
+                                <td className="py-3 px-3.5 text-indigo-300 font-medium">{emp.email}</td>
+                                <td className="py-3 px-3.5 text-emerald-300 font-semibold">{emp.phone}</td>
+                                <td className="py-3 px-3.5">
                                   <Badge
                                     variant={emp.role === 'Store Manager' ? 'info' : 'success'}
-                                    className="text-[10px] px-1.5 py-0"
+                                    className="text-[10px] px-2 py-0.5 font-semibold"
                                   >
                                     {emp.role}
                                   </Badge>
                                 </td>
-                                <td className="py-3 px-3 text-slate-300 flex items-center gap-1">
-                                  <Store className="w-3 h-3 text-slate-500 inline" />
+                                <td className="py-3 px-3.5 text-slate-300 flex items-center gap-1.5 font-medium">
+                                  <Store className="w-3.5 h-3.5 text-slate-500 inline" />
                                   {emp.store}
                                 </td>
-                                <td className="py-3 px-3">
+                                <td className="py-3 px-3.5">
                                   <span
-                                    className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                                       emp.status === 'ACTIVE'
-                                        ? 'bg-emerald-500/20 text-emerald-400'
-                                        : 'bg-amber-500/20 text-amber-400'
+                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                                     }`}
                                   >
                                     {emp.status}
                                   </span>
                                 </td>
-                                <td className="py-3 px-3 text-right text-slate-400">{emp.lastActive}</td>
+                                <td className="py-3 px-3.5 text-right text-slate-400 font-medium">{emp.lastActive}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -890,32 +900,32 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
 
       {/* TAB 2: Authentication & Login Logs (with Business Filter) */}
       {currentTab === 'auth_logs' && (
-        <div className="space-y-4">
-          <Card className="border-slate-800 bg-slate-900/80">
-            <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-4 font-sans">
+          <Card className="border-slate-800/80 bg-slate-900/80 shadow-xl overflow-hidden">
+            <div className="p-4 border-b border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
               {/* Search */}
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Filter by email, event name, or IP address..."
                   value={logSearchQuery}
                   onChange={(e) => setLogSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition"
                 />
               </div>
 
               {/* Filters */}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2.5">
                 {/* Filter By Business Selection Dropdown */}
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] text-slate-400 font-semibold uppercase">Business:</span>
                   <select
                     value={selectedBusinessFilter}
                     onChange={(e) => setSelectedBusinessFilter(e.target.value)}
-                    className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-purple-300 font-semibold focus:outline-none focus:border-purple-500"
+                    className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-indigo-300 font-semibold focus:outline-none focus:border-indigo-500"
                   >
-                    <option value="all">All Businesses & Platform</option>
+                    <option value="all">All Businesses &amp; Platform</option>
                     <option value="aravali">Aravali Retail Group</option>
                     <option value="northwind">Northwind Enterprises</option>
                     <option value="root">System Root / Admin Only</option>
@@ -925,7 +935,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                 <select
                   value={logSeverityFilter}
                   onChange={(e) => setLogSeverityFilter(e.target.value)}
-                  className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-purple-500"
+                  className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 font-medium focus:outline-none focus:border-indigo-500"
                 >
                   <option value="all">All Severities</option>
                   <option value="SUCCESS">Success Only</option>
@@ -939,7 +949,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                   size="sm"
                   onClick={handleExportLogs}
                   icon={Download}
-                  className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs"
+                  className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200"
                 >
                   Export Logs
                 </Button>
@@ -948,10 +958,10 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
 
             {/* Detailed Auth Stream Table */}
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
-                <thead className="text-[11px] uppercase text-slate-400 border-b border-slate-800 bg-slate-950/60">
+              <table className="w-full text-left text-xs">
+                <thead className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 border-b border-slate-800 bg-slate-950/80">
                   <tr>
-                    <th className="p-3.5">Timestamp & Date</th>
+                    <th className="p-3.5">Timestamp &amp; Date</th>
                     <th className="p-3.5">Actor Email</th>
                     <th className="p-3.5">Business Workspace</th>
                     <th className="p-3.5">Auth Method / Event</th>
@@ -977,22 +987,22 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                       return (
                         <tr key={event.id || Math.random()} className="hover:bg-slate-800/30 transition">
                           <td className="p-3.5 whitespace-nowrap">
-                            <span className="font-bold text-white block">
+                            <span className="font-bold text-white block tabular-nums">
                               {dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </span>
-                            <span className="text-[11px] text-slate-500">
+                            <span className="text-[11px] text-slate-400 font-medium">
                               {dateObj.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                             </span>
                           </td>
-                          <td className="p-3.5 font-bold text-purple-300">{email}</td>
+                          <td className="p-3.5 font-bold text-indigo-300">{email}</td>
                           <td className="p-3.5 text-slate-300">
-                            <span className="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-[11px]">
+                            <span className="px-2.5 py-1 rounded-md bg-slate-950 border border-slate-800 text-[11px] font-semibold">
                               {biz}
                             </span>
                           </td>
                           <td className="p-3.5">
                             <span className="text-slate-200 block font-semibold">{event.event_type}</span>
-                            <span className="text-[11px] text-slate-400">{method}</span>
+                            <span className="text-[11px] text-slate-400 font-medium">{method}</span>
                           </td>
                           <td className="p-3.5">
                             <Badge
@@ -1001,7 +1011,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                                 severity === 'WARNING' ? 'warning' :
                                 severity === 'SUCCESS' ? 'success' : 'info'
                               }
-                              className="text-[10px] px-1.5 py-0"
+                              className="text-[10px] px-2 py-0.5 font-semibold"
                             >
                               {severity}
                             </Badge>
@@ -1010,7 +1020,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                             <button
                               type="button"
                               onClick={() => setSelectedEventModal(event)}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
                               title="Inspect Payload"
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -1029,15 +1039,15 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
 
       {/* TAB 3: AI Models & Last Train Dates (Per Business) */}
       {currentTab === 'ai_models' && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4">
+        <div className="space-y-6 font-sans">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/80 border border-slate-800/80 rounded-2xl p-5 shadow-lg backdrop-blur-md">
             <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-purple-400" />
-                AI Inference Engines & Training Schedules
+              <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-indigo-400" />
+                AI Inference Engines &amp; Training Schedules
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Inspect last training dates, model architectures, accuracy scores, and retrain pipelines per business.
+              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                Inspect last training dates, model architectures, accuracy scores, and retrain pipelines per business tenant.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1045,7 +1055,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
               <select
                 value={selectedBusinessFilter}
                 onChange={(e) => setSelectedBusinessFilter(e.target.value)}
-                className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-purple-300 font-semibold focus:outline-none focus:border-purple-500"
+                className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-indigo-300 font-semibold focus:outline-none focus:border-indigo-500"
               >
                 <option value="all">All Businesses</option>
                 <option value="aravali">Aravali Retail Group</option>
@@ -1058,17 +1068,17 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
             {businesses
               .filter((b) => selectedBusinessFilter === 'all' || b.id === selectedBusinessFilter)
               .map((biz) => (
-                <Card key={biz.id} className="border-slate-800 bg-slate-900/80">
-                  <CardHeader className="border-b border-slate-800 pb-4">
+                <Card key={biz.id} className="border-slate-800/80 bg-slate-900/80 shadow-xl overflow-hidden">
+                  <CardHeader className="border-b border-slate-800/80 pb-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-purple-400" />
-                          <CardTitle className="text-base font-bold text-white">{biz.name}</CardTitle>
-                          <Badge variant="info" className="text-[10px]">5 AI Engines Configured</Badge>
+                        <div className="flex items-center gap-2.5">
+                          <Building2 className="w-4 h-4 text-indigo-400" />
+                          <CardTitle className="text-base font-bold text-white tracking-tight">{biz.name}</CardTitle>
+                          <Badge variant="info" className="text-[10px] font-semibold">5 AI Engines Configured</Badge>
                         </div>
-                        <CardDescription className="text-xs mt-1">
-                          Tenant ID: {biz.id} • Owner: {biz.ownerName} ({biz.ownerPhone} • {biz.ownerEmail})
+                        <CardDescription className="text-xs mt-1 text-slate-400">
+                          Tenant ID: <strong className="text-slate-300 font-mono">{biz.id}</strong> • Owner: <strong className="text-slate-300">{biz.ownerName}</strong> ({biz.ownerPhone} • {biz.ownerEmail})
                         </CardDescription>
                       </div>
 
@@ -1078,51 +1088,51 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                         onClick={() => handleRetrainAllForBusiness(biz.id)}
                         isLoading={retrainingModel === biz.id}
                         icon={RefreshCw}
-                        className="text-xs border-purple-500/40 bg-purple-950/40 hover:bg-purple-900/60 text-purple-200"
+                        className="text-xs border-indigo-500/40 bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-200 font-semibold"
                       >
                         Retrain All Models for {biz.name.split(' ')[0]}
                       </Button>
                     </div>
                   </CardHeader>
 
-                  <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {biz.aiModels.map((model, idx) => (
                       <div
                         key={idx}
-                        className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 flex flex-col justify-between space-y-3"
+                        className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col justify-between space-y-3.5 shadow-md hover:border-slate-700 transition"
                       >
                         <div>
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <h5 className="font-bold text-white text-xs">{model.name}</h5>
-                              <p className="text-[11px] font-mono text-purple-400 mt-0.5">{model.algorithm}</p>
+                              <h5 className="font-bold text-white text-xs tracking-tight">{model.name}</h5>
+                              <p className="text-[11px] font-semibold text-indigo-400 mt-0.5">{model.algorithm}</p>
                             </div>
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 font-mono">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                               ACTIVE
                             </span>
                           </div>
 
-                          <div className="mt-3 pt-2.5 border-t border-slate-800/80 space-y-1.5 text-xs font-mono">
-                            <div className="flex justify-between">
-                              <span className="text-slate-500 text-[11px]">Last Trained:</span>
+                          <div className="mt-3.5 pt-3 border-t border-slate-800/80 space-y-2 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400 text-[11px] font-medium">Last Trained:</span>
                               <span className="text-emerald-400 font-bold text-[11px] flex items-center gap-1">
                                 <Calendar className="w-3 h-3 text-emerald-400" />
                                 {model.lastTrained}
                               </span>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500 text-[11px]">Version:</span>
-                              <span className="text-slate-300 text-[11px]">{model.version}</span>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400 text-[11px] font-medium">Version:</span>
+                              <span className="text-slate-300 font-mono text-[11px]">{model.version}</span>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500 text-[11px]">Accuracy Score:</span>
-                              <span className="text-purple-300 font-bold text-[11px]">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400 text-[11px] font-medium">Accuracy Score:</span>
+                              <span className="text-indigo-300 font-bold text-[11px] tabular-nums">
                                 {(model.accuracyScore * 100).toFixed(1)}%
                               </span>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500 text-[11px]">Scope:</span>
-                              <span className="text-slate-400 text-[11px] truncate max-w-[150px]">{model.horizon}</span>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400 text-[11px] font-medium">Scope:</span>
+                              <span className="text-slate-300 text-[11px] font-medium truncate max-w-[150px]">{model.horizon}</span>
                             </div>
                           </div>
                         </div>
@@ -1131,15 +1141,15 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                           type="button"
                           disabled={retrainingModel === `${biz.id}-${model.name}`}
                           onClick={() => handleRetrainModel(biz.id, model.name)}
-                          className="w-full py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-purple-900/40 border border-slate-800 hover:border-purple-500/40 text-purple-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                          className="w-full py-2 px-2.5 rounded-xl bg-slate-900 hover:bg-indigo-900/40 border border-slate-800 hover:border-indigo-500/40 text-indigo-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition disabled:opacity-50"
                         >
                           {retrainingModel === `${biz.id}-${model.name}` ? (
                             <>
-                              <RefreshCw className="w-3 h-3 animate-spin" /> Retraining...
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Retraining...
                             </>
                           ) : (
                             <>
-                              <RefreshCw className="w-3 h-3" /> Retrain Model
+                              <RefreshCw className="w-3.5 h-3.5" /> Retrain Model
                             </>
                           )}
                         </button>
@@ -1154,24 +1164,24 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
 
       {/* TAB 4: Dedicated Error Handling & Diagnostics */}
       {currentTab === 'errors' && (
-        <div className="space-y-4">
-          <Card className="border-slate-800 bg-slate-900/80">
-            <CardHeader className="border-b border-slate-800 pb-3">
+        <div className="space-y-4 font-sans">
+          <Card className="border-slate-800/80 bg-slate-900/80 shadow-xl overflow-hidden">
+            <CardHeader className="border-b border-slate-800/80 pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <AlertTriangle className="w-4 h-4 text-rose-400" />
-                    <CardTitle className="text-base font-bold text-white">System Error & Exception Diagnostic Center</CardTitle>
-                    <Badge variant="danger" className="text-[10px]">
+                    <CardTitle className="text-base font-bold text-white tracking-tight">System Error &amp; Exception Diagnostic Center</CardTitle>
+                    <Badge variant="danger" className="text-[10px] font-semibold">
                       {systemErrors.filter((e) => e.status !== 'RESOLVED').length} Active Issues
                     </Badge>
                   </div>
-                  <CardDescription className="text-xs mt-1">
+                  <CardDescription className="text-xs mt-1 text-slate-400 leading-relaxed">
                     Live capture of unhandled API exceptions, database locks, ML inference warnings, and email delivery timeouts.
                   </CardDescription>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2.5">
                   <Button
                     variant="outline"
                     size="sm"
@@ -1186,7 +1196,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                     size="sm"
                     onClick={handleClearResolvedErrors}
                     icon={Trash2}
-                    className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs"
+                    className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
                   >
                     Clear Resolved
                   </Button>
@@ -1195,7 +1205,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                     size="sm"
                     onClick={handleExportErrors}
                     icon={Download}
-                    className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs"
+                    className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
                   >
                     Export Report
                   </Button>
@@ -1204,23 +1214,23 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
             </CardHeader>
 
             {/* Error Filters & Search Bar */}
-            <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="p-4 border-b border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search error code, message, endpoint, or business..."
                   value={errorSearchQuery}
                   onChange={(e) => setErrorSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition"
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <select
                   value={selectedErrorSeverity}
                   onChange={(e) => setSelectedErrorSeverity(e.target.value)}
-                  className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-purple-500"
+                  className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 font-medium focus:outline-none focus:border-indigo-500"
                 >
                   <option value="all">All Severities</option>
                   <option value="CRITICAL">Critical Only</option>
@@ -1232,7 +1242,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                 <select
                   value={selectedErrorCategory}
                   onChange={(e) => setSelectedErrorCategory(e.target.value)}
-                  className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-purple-500"
+                  className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 font-medium focus:outline-none focus:border-indigo-500"
                 >
                   <option value="all">All Categories</option>
                   <option value="Email Gateway">Email Gateway</option>
@@ -1245,7 +1255,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
             </div>
 
             {/* Error Records Stream */}
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-3.5">
               {filteredErrors.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">
                   No system error logs match your search filters.
@@ -1256,7 +1266,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                   return (
                     <div
                       key={err.id}
-                      className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 transition space-y-2.5 font-mono text-xs"
+                      className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 transition space-y-3 shadow-md"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5 flex-wrap">
@@ -1265,46 +1275,46 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                               err.severity === 'CRITICAL' ? 'danger' :
                               err.severity === 'WARNING' ? 'warning' : 'info'
                             }
-                            className="text-[10px] px-1.5 py-0"
+                            className="text-[10px] px-2 py-0.5 font-semibold"
                           >
                             {err.severity}
                           </Badge>
-                          <span className="font-bold text-white text-xs">{err.errorCode}</span>
-                          <span className="text-[11px] text-purple-400">[{err.category}]</span>
-                          <span className="text-[11px] text-slate-400">ID: {err.id}</span>
+                          <span className="font-bold text-white text-xs font-mono">{err.errorCode}</span>
+                          <span className="text-[11px] text-indigo-400 font-semibold">[{err.category}]</span>
+                          <span className="text-[11px] text-slate-400 font-mono">ID: {err.id}</span>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="text-slate-500 text-[11px]">{err.timestamp}</span>
+                          <span className="text-slate-400 text-[11px] font-medium">{err.timestamp}</span>
                           {isResolved ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                               RESOLVED
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 animate-pulse">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse">
                               ACTIVE
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-slate-300">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                         <div>
-                          <span className="text-slate-500 text-[11px]">Affected Business: </span>
+                          <span className="text-slate-400 text-[11px] font-medium">Affected Business: </span>
                           <span className="text-white font-semibold">{err.business}</span>
                         </div>
                         <div>
-                          <span className="text-slate-500 text-[11px]">Endpoint / Context: </span>
-                          <span className="text-purple-300">{err.endpoint}</span>
+                          <span className="text-slate-400 text-[11px] font-medium">Endpoint / Context: </span>
+                          <span className="text-indigo-300 font-mono text-[11px]">{err.endpoint}</span>
                         </div>
                       </div>
 
-                      <p className="text-slate-300 text-xs font-sans leading-relaxed bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/60">
+                      <p className="text-slate-300 text-xs leading-relaxed bg-slate-900/80 p-3 rounded-xl border border-slate-800/80 font-medium">
                         {err.message}
                       </p>
 
                       <div className="flex items-center justify-between pt-1">
-                        <div className="text-[11px] text-emerald-400/90 truncate max-w-lg">
+                        <div className="text-[11px] text-emerald-400/90 truncate max-w-lg font-medium">
                           <strong>Resolution:</strong> {err.resolution}
                         </div>
 
@@ -1313,7 +1323,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                             <button
                               type="button"
                               onClick={() => handleResolveError(err.id)}
-                              className="px-2.5 py-1 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 text-[11px] font-semibold transition"
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold transition"
                             >
                               Mark Resolved
                             </button>
@@ -1321,7 +1331,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                           <button
                             type="button"
                             onClick={() => setSelectedErrorModal(err)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
                             title="View Stack Trace"
                           >
                             <FileCode className="w-3.5 h-3.5" />
@@ -1339,81 +1349,81 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
 
       {/* TAB 5: System Health & RBAC Policy */}
       {currentTab === 'system' && (
-        <div className="space-y-6">
+        <div className="space-y-6 font-sans">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <Card className="border-slate-800 bg-slate-900/90">
-              <CardHeader className="pb-3 border-b border-slate-800">
+            <Card className="border-slate-800/80 bg-slate-900/90 shadow-lg">
+              <CardHeader className="pb-3 border-b border-slate-800/80">
                 <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
                   <Database className="w-4 h-4 text-emerald-400" /> Database Architecture
                 </CardTitle>
               </CardHeader>
-              <div className="p-4 space-y-3 text-xs font-mono">
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Engine</span>
-                  <span className="text-white font-bold">SQLite 3 / WAL Mode</span>
+              <div className="p-4 space-y-3 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-800/80">
+                  <span className="text-slate-400 font-medium">Engine</span>
+                  <span className="text-white font-bold font-mono">SQLite 3 / WAL Mode</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Connection Pool</span>
+                <div className="flex justify-between py-1 border-b border-slate-800/80">
+                  <span className="text-slate-400 font-medium">Connection Pool</span>
                   <span className="text-emerald-400 font-bold">StaticPool (Healthy)</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Query Latency</span>
-                  <span className="text-white font-bold">{dbStatus.latencyMs} ms</span>
+                <div className="flex justify-between py-1 border-b border-slate-800/80">
+                  <span className="text-slate-400 font-medium">Query Latency</span>
+                  <span className="text-white font-bold tabular-nums">{dbStatus.latencyMs} ms</span>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-slate-400">Multi-Tenancy</span>
+                  <span className="text-slate-400 font-medium">Multi-Tenancy</span>
                   <span className="text-emerald-400 font-bold">Tenant-Partitioned</span>
                 </div>
               </div>
             </Card>
 
-            <Card className="border-slate-800 bg-slate-900/90">
-              <CardHeader className="pb-3 border-b border-slate-800">
+            <Card className="border-slate-800/80 bg-slate-900/90 shadow-lg">
+              <CardHeader className="pb-3 border-b border-slate-800/80">
                 <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                  <Server className="w-4 h-4 text-purple-400" /> Runtime Environment
+                  <Server className="w-4 h-4 text-indigo-400" /> Runtime Environment
                 </CardTitle>
               </CardHeader>
-              <div className="p-4 space-y-3 text-xs font-mono">
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Environment</span>
-                  <span className="text-purple-300 font-bold">Development / Staging</span>
+              <div className="p-4 space-y-3 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-800/80">
+                  <span className="text-slate-400 font-medium">Environment</span>
+                  <span className="text-indigo-300 font-bold">Development / Production</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Python Backend</span>
-                  <span className="text-white font-bold">FastAPI + Uvicorn</span>
+                <div className="flex justify-between py-1 border-b border-slate-800/80">
+                  <span className="text-slate-400 font-medium">Python Backend</span>
+                  <span className="text-white font-bold font-mono">FastAPI + Uvicorn</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Frontend Stack</span>
-                  <span className="text-white font-bold">React 18 + Vite</span>
+                <div className="flex justify-between py-1 border-b border-slate-800/80">
+                  <span className="text-slate-400 font-medium">Frontend Stack</span>
+                  <span className="text-white font-bold font-mono">React 18 + Vite</span>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-slate-400">Auth Engine</span>
-                  <span className="text-emerald-400 font-bold">Passwordless OTP + JWT</span>
+                  <span className="text-slate-400 font-medium">Auth Engine</span>
+                  <span className="text-emerald-400 font-bold">OTP + JWT Verification</span>
                 </div>
               </div>
             </Card>
 
-            <Card className="border-slate-800 bg-slate-900/90">
-              <CardHeader className="pb-3 border-b border-slate-800">
+            <Card className="border-slate-800/80 bg-slate-900/90 shadow-lg">
+              <CardHeader className="pb-3 border-b border-slate-800/80">
                 <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
                   <Mail className="w-4 h-4 text-blue-400" /> Dispatch Service
                 </CardTitle>
               </CardHeader>
-              <div className="p-4 space-y-3 text-xs font-mono">
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Provider</span>
+              <div className="p-4 space-y-3 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-800/80">
+                  <span className="text-slate-400 font-medium">Provider</span>
                   <span className="text-blue-400 font-bold">Resend.com API</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">API Key Status</span>
-                  <span className="text-emerald-400 font-bold">Configured (re_***)</span>
+                <div className="flex justify-between py-1 border-b border-slate-800/80">
+                  <span className="text-slate-400 font-medium">API Key Status</span>
+                  <span className="text-emerald-400 font-bold">Configured (Active)</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Sender Address</span>
-                  <span className="text-white font-bold">onboarding@resend.dev</span>
+                <div className="flex justify-between py-1 border-b border-slate-800/80">
+                  <span className="text-slate-400 font-medium">Sender Address</span>
+                  <span className="text-white font-mono text-[11px]">onboarding@resend.dev</span>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-slate-400">OTP Expiration</span>
+                  <span className="text-slate-400 font-medium">OTP Expiration</span>
                   <span className="text-white font-bold">10 Minutes</span>
                 </div>
               </div>
@@ -1421,33 +1431,33 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
           </div>
 
           {/* RBAC Policy Matrix Table */}
-          <Card className="border-slate-800 bg-slate-900/80">
-            <CardHeader className="border-b border-slate-800 pb-3">
+          <Card className="border-slate-800/80 bg-slate-900/80 shadow-xl overflow-hidden">
+            <CardHeader className="border-b border-slate-800/80 pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-purple-400" />
+                    <Lock className="w-4 h-4 text-indigo-400" />
                     Role-Based Access Control (RBAC) System Explorer
                   </CardTitle>
-                  <CardDescription className="text-xs">
+                  <CardDescription className="text-xs text-slate-400">
                     Inspect system-enforced authorization policies across all roles.
                   </CardDescription>
                 </div>
                 <div className="relative w-full sm:w-64">
-                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="Filter permissions..."
                     value={rbacSearch}
                     onChange={(e) => setRbacSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500"
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
             </CardHeader>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="uppercase text-slate-400 border-b border-slate-800 bg-slate-950/40 font-mono">
+                <thead className="uppercase tracking-wider text-[11px] font-semibold text-slate-400 border-b border-slate-800 bg-slate-950/80 font-mono">
                   <tr>
                     <th className="p-3.5">Permission Key</th>
                     <th className="p-3.5 text-center">Business Owner</th>
@@ -1483,11 +1493,11 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
 
       {/* Auth Event Payload Modal */}
       {selectedEventModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-xl rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in font-sans">
+          <div className="w-full max-w-xl rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
-                <h3 className="font-mono font-bold text-white text-sm">
+                <h3 className="font-bold text-white text-sm">
                   {selectedEventModal.event_type}
                 </h3>
                 <p className="text-[11px] text-slate-400 font-mono mt-0.5">
@@ -1497,13 +1507,13 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
               <button
                 type="button"
                 onClick={() => setSelectedEventModal(null)}
-                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto rounded-xl bg-slate-950 p-4 border border-slate-800/80 font-mono text-xs text-purple-300">
+            <div className="flex-1 overflow-y-auto rounded-2xl bg-slate-950 p-4 border border-slate-800/80 font-mono text-xs text-indigo-300">
               <pre>{JSON.stringify(selectedEventModal, null, 2)}</pre>
             </div>
 
@@ -1513,7 +1523,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                 size="sm"
                 onClick={() => handleCopyText(JSON.stringify(selectedEventModal, null, 2), 'modal')}
                 icon={copiedKey === 'modal' ? Check : Copy}
-                className="text-xs"
+                className="text-xs font-semibold"
               >
                 {copiedKey === 'modal' ? 'Copied' : 'Copy JSON'}
               </Button>
@@ -1521,7 +1531,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                 variant="primary"
                 size="sm"
                 onClick={() => setSelectedEventModal(null)}
-                className="text-xs bg-purple-600 hover:bg-purple-500"
+                className="text-xs bg-indigo-600 hover:bg-indigo-500 font-semibold"
               >
                 Close
               </Button>
@@ -1532,15 +1542,15 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
 
       {/* Error Trace Diagnostic Modal */}
       {selectedErrorModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-2xl rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in font-sans">
+          <div className="w-full max-w-2xl rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={selectedErrorModal.severity === 'CRITICAL' ? 'danger' : 'warning'} className="text-[10px]">
+                  <Badge variant={selectedErrorModal.severity === 'CRITICAL' ? 'danger' : 'warning'} className="text-[10px] font-semibold">
                     {selectedErrorModal.severity}
                   </Badge>
-                  <h3 className="font-mono font-bold text-white text-sm">
+                  <h3 className="font-bold text-white text-sm font-mono">
                     {selectedErrorModal.errorCode}
                   </h3>
                 </div>
@@ -1551,33 +1561,33 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
               <button
                 type="button"
                 onClick={() => setSelectedErrorModal(null)}
-                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-3 flex-1 overflow-y-auto">
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                <span className="text-[11px] font-mono text-slate-500 uppercase font-bold">Error Message</span>
-                <p className="text-xs text-slate-200">{selectedErrorModal.message}</p>
+            <div className="space-y-3.5 flex-1 overflow-y-auto">
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Error Message</span>
+                <p className="text-xs text-slate-200 leading-relaxed font-medium">{selectedErrorModal.message}</p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                <span className="text-[11px] font-mono text-slate-500 uppercase font-bold">Stack Trace & Execution Path</span>
-                <pre className="text-xs font-mono text-rose-300 whitespace-pre-wrap overflow-x-auto bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Stack Trace &amp; Execution Path</span>
+                <pre className="text-xs font-mono text-rose-300 whitespace-pre-wrap overflow-x-auto bg-slate-900/90 p-3 rounded-xl border border-slate-800/80">
                   {selectedErrorModal.stackTrace}
                 </pre>
               </div>
 
-              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 space-y-1">
-                <span className="text-[11px] font-mono text-emerald-400 uppercase font-bold">Automated Remediation</span>
-                <p className="text-xs text-emerald-200">{selectedErrorModal.resolution}</p>
+              <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 space-y-1">
+                <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Automated Remediation</span>
+                <p className="text-xs text-emerald-200 font-medium">{selectedErrorModal.resolution}</p>
               </div>
             </div>
 
             <div className="flex justify-between items-center pt-2 border-t border-slate-800">
-              <span className="text-[11px] font-mono text-slate-500">
+              <span className="text-[11px] text-slate-400 font-medium">
                 Timestamp: {selectedErrorModal.timestamp}
               </span>
               <div className="flex gap-2">
@@ -1586,7 +1596,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                   size="sm"
                   onClick={() => handleCopyText(selectedErrorModal.stackTrace, 'err_trace')}
                   icon={copiedKey === 'err_trace' ? Check : Copy}
-                  className="text-xs"
+                  className="text-xs font-semibold"
                 >
                   {copiedKey === 'err_trace' ? 'Copied' : 'Copy Trace'}
                 </Button>
@@ -1594,7 +1604,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                   variant="primary"
                   size="sm"
                   onClick={() => setSelectedErrorModal(null)}
-                  className="text-xs bg-purple-600 hover:bg-purple-500"
+                  className="text-xs bg-indigo-600 hover:bg-indigo-500 font-semibold"
                 >
                   Close
                 </Button>
