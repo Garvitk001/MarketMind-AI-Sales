@@ -1216,8 +1216,8 @@ export const OwnerDashboard = ({ onNavigate }) => {
         <Card>
           <CardHeader>
             <div>
-              <CardTitle>Category Sales & Revenue Distribution</CardTitle>
-              <CardDescription>Product category market share analysis</CardDescription>
+              <CardTitle>Category Distribution Summary</CardTitle>
+              <CardDescription>Product category revenue & catalog share</CardDescription>
             </div>
           </CardHeader>
 
@@ -1225,7 +1225,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={categoryDistribution}
+                  data={categorySalesData}
                   cx="50%"
                   cy="50%"
                   innerRadius={55}
@@ -1233,23 +1233,26 @@ export const OwnerDashboard = ({ onNavigate }) => {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {categoryDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {categorySalesData.map((entry, index) => (
+                    <Cell key={`summary-cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', color: '#fff' }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', color: '#fff' }}
+                  formatter={(val, name) => [money(val), name]}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
 
           <div className="space-y-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-            {categoryDistribution.map((item) => (
+            {categorySalesData.slice(0, 4).map((item) => (
               <div key={item.name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
                   <span className="text-slate-600 dark:text-slate-300 font-medium">{item.name}</span>
                 </div>
-                <span className="font-bold text-slate-900 dark:text-slate-100">{item.value}%</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">{item.percentage}%</span>
               </div>
             ))}
           </div>
