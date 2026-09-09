@@ -23,6 +23,19 @@ class StoreResponse(ORMModel):
     is_active: bool
 
 
+class StoreCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    code: str = Field(min_length=1, max_length=40)
+    timezone: str = Field(default="Asia/Kolkata", min_length=2, max_length=64)
+
+
+class StoreUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    code: str | None = Field(default=None, min_length=1, max_length=40)
+    timezone: str | None = Field(default=None, min_length=2, max_length=64)
+    is_active: bool | None = None
+
+
 class UserResponse(ORMModel):
     id: UUID
     tenant_id: UUID

@@ -28,6 +28,9 @@ import {
   KeyRound,
   ExternalLink,
   Save,
+  Trash2,
+  Store,
+  Plus,
 } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
@@ -85,6 +88,8 @@ export const TeamManagementModule = () => {
   const [assignments, setAssignments] = useState({});
   const [targetEmployee, setTargetEmployee] = useState(null);
   const [target, setTarget] = useState({ targetValue: '', periodStart: '', periodEnd: '' });
+  const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
+  const [storeForm, setStoreForm] = useState({ name: '', code: '', timezone: 'Asia/Kolkata' });
 
   const apiRef = useRef(api);
   const addToastRef = useRef(addToast);
@@ -243,6 +248,20 @@ export const TeamManagementModule = () => {
     });
   };
 
+  const viewOrReissueToken = async (employee) => {
+    try {
+      const result = await api(`/users/${employee.employee_id}/invitation-token`);
+      if (result.token) {
+        setInvitationToken(result.token);
+        addToast(`Active invitation token retrieved for ${employee.full_name}`, 'success');
+        return;
+      }
+    } catch {
+      // Token not active or expired, trigger fresh issuance
+    }
+    reissueToken(employee);
+  };
+
   const reissueToken = (employee) => {
     requestConfirmation(`Generate fresh activation token for ${employee.full_name}`, async (reauthToken) => {
       const result = await api(`/users/${employee.employee_id}/reissue-invitation`, {
@@ -253,6 +272,41 @@ export const TeamManagementModule = () => {
         setInvitationToken(result.token);
       }
       addToast(result.message || 'Activation token generated successfully', 'success');
+    });
+  };
+
+  const deleteEmployee = (employee) => {
+    requestConfirmation(`Permanently delete employee account for ${employee.full_name} (${employee.email})`, async (reauthToken) => {
+      const result = await api(`/users/${employee.employee_id}`, {
+        method: 'DELETE',
+        headers: { 'X-Reauth-Token': reauthToken },
+      });
+      setSelected(null);
+      addToast(result.message || 'Employee deleted successfully', 'success');
+      await Promise.all([refresh(), loadPerformance()]);
+    });
+  };
+
+  const createStore = (event) => {
+    event.preventDefault();
+    if (!storeForm.name.trim() || !storeForm.code.trim()) {
+      addToast('Store name and store code are required.', 'error');
+      return;
+    }
+    requestConfirmation(`Create new store location: ${storeForm.name.trim()}`, async (reauthToken) => {
+      const result = await api('/users/stores', {
+        method: 'POST',
+        headers: { 'X-Reauth-Token': reauthToken },
+        body: JSON.stringify({
+          name: storeForm.name.trim(),
+          code: storeForm.code.trim().toUpperCase(),
+          timezone: storeForm.timezone || 'Asia/Kolkata',
+        }),
+      });
+      setIsStoreModalOpen(false);
+      setStoreForm({ name: '', code: '', timezone: 'Asia/Kolkata' });
+      addToast(result.message || `Store location '${result.name}' created successfully!`, 'success');
+      await Promise.all([loadCatalogs(), refresh()]);
     });
   };
 
@@ -370,7 +424,7 @@ export const TeamManagementModule = () => {
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           <p className="text-sm text-indigo-200 mt-1">{description}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -381,9 +435,20 @@ export const TeamManagementModule = () => {
             Export Team Report (CSV)
           </Button>
           {isOwner && (
-            <Button icon={UserPlus} size="sm" onClick={() => setIsInviteOpen(true)}>
-              Invite Employee
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                icon={Store}
+                onClick={() => setIsStoreModalOpen(true)}
+                className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+              >
+                Store Branches ({stores.length})
+              </Button>
+              <Button icon={UserPlus} size="sm" onClick={() => setIsInviteOpen(true)}>
+                Invite Employee
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -513,7 +578,8 @@ export const TeamManagementModule = () => {
                     isOwner={isOwner}
                     onSelect={() => setSelected(employee)}
                     onSetTarget={() => openTarget(employee)}
-                    onReissueToken={() => reissueToken(employee)}
+                    onViewOrReissueToken={() => viewOrReissueToken(employee)}
+                    onDeleteEmployee={() => deleteEmployee(employee)}
                   />
                 ))}
               </tbody>
@@ -540,7 +606,8 @@ export const TeamManagementModule = () => {
             isOwner={isOwner}
             onSetTarget={() => openTarget(selected)}
             onSaveEmployee={() => saveEmployeeDetails(selected)}
-            onReissueToken={() => reissueToken(selected)}
+            onViewOrReissueToken={() => viewOrReissueToken(selected)}
+            onDelete={() => deleteEmployee(selected)}
             onToggle={() => toggleEmployee(selected)}
             roles={roles}
             stores={stores}
@@ -739,11 +806,91 @@ export const TeamManagementModule = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Store Branches Management Modal */}
+      <Modal
+        isOpen={isStoreModalOpen}
+        onClose={() => setIsStoreModalOpen(false)}
+        title="Manage Business Store Branches"
+        maxWidth="max-w-2xl"
+      >
+        <div className="space-y-5">
+          <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/40 p-4 border border-indigo-200 dark:border-indigo-800 space-y-1">
+            <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 font-bold text-sm">
+              <Store className="w-5 h-5 text-indigo-500" />
+              <span>Multi-Store Architecture</span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              Each store maintains its own dedicated warehouse inventory, staff assignments, and location sales metrics.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+              Active Store Branches ({stores.length})
+            </h4>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {stores.map((store) => (
+                <div
+                  key={store.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">
+                      <Store className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-slate-900 dark:text-slate-100">{store.name}</p>
+                      <p className="text-xs text-slate-500 font-mono">Code: {store.code} · Timezone: {store.timezone}</p>
+                    </div>
+                  </div>
+                  <Badge variant="success" size="sm">Active Branch</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <form onSubmit={createStore} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 space-y-3">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+              <Plus className="w-4 h-4 text-indigo-500" />
+              <span>Add New Store Branch</span>
+            </h4>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Input
+                label="Store Location Name"
+                placeholder="e.g. South Extension Outlet"
+                value={storeForm.name}
+                onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })}
+                required
+              />
+              <Input
+                label="Branch Code (Unique)"
+                placeholder="e.g. STORE-02"
+                value={storeForm.code}
+                onChange={(e) => setStoreForm({ ...storeForm, code: e.target.value })}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="submit" size="sm" icon={Plus}>
+                Create Branch Location
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Modal>
     </div>
   );
 };
 
-const EmployeeRow = ({ employee, isOwner, onSelect, onSetTarget, onReissueToken }) => {
+const EmployeeRow = ({
+  employee,
+  isOwner,
+  onSelect,
+  onSetTarget,
+  onViewOrReissueToken,
+  onDeleteEmployee,
+}) => {
   const pitchScore = Math.min(98, 75 + ((employee.employee_id ? employee.employee_id.charCodeAt(0) : 7) % 23));
   const isPending = employee.status === 'invited';
 
@@ -817,12 +964,12 @@ const EmployeeRow = ({ employee, isOwner, onSelect, onSetTarget, onReissueToken 
         {isPending ? (
           <div className="flex items-center gap-1.5 flex-wrap">
             <Badge variant="warning">Pending Activation</Badge>
-            {isOwner && onReissueToken && (
+            {isOwner && onViewOrReissueToken && (
               <Button
                 size="xs"
                 variant="ghost"
                 icon={KeyRound}
-                onClick={onReissueToken}
+                onClick={onViewOrReissueToken}
                 title="Get or Reissue Activation Token"
                 className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 p-1"
               >
@@ -842,9 +989,19 @@ const EmployeeRow = ({ employee, isOwner, onSelect, onSetTarget, onReissueToken 
           Edit &amp; Analyse
         </Button>
         {isOwner && (
-          <Button size="xs" variant="secondary" icon={Target} onClick={onSetTarget} title="Set Target">
-            Target
-          </Button>
+          <>
+            <Button size="xs" variant="secondary" icon={Target} onClick={onSetTarget} title="Set Target">
+              Target
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              icon={Trash2}
+              onClick={onDeleteEmployee}
+              title="Delete Employee Account"
+              className="text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 p-1"
+            />
+          </>
         )}
       </td>
     </tr>
@@ -901,7 +1058,8 @@ const PerformanceDetail = ({
   isOwner,
   onSetTarget,
   onSaveEmployee,
-  onReissueToken,
+  onViewOrReissueToken,
+  onDelete,
   onToggle,
   roles,
   stores,
@@ -1248,16 +1406,26 @@ const PerformanceDetail = ({
           Download Brief (CSV)
         </Button>
         {isOwner && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isPending && onViewOrReissueToken && (
+              <Button variant="outline" size="sm" icon={KeyRound} onClick={onViewOrReissueToken}>
+                Get / Reissue Token
+              </Button>
+            )}
             <Button variant="primary" size="sm" icon={Save} onClick={onSaveEmployee}>
-              Save Employee Details
+              Save Details
             </Button>
             <Button variant="outline" size="sm" icon={Target} onClick={onSetTarget}>
               Set Target
             </Button>
-            <Button variant={employee.status === 'active' ? 'danger' : 'primary'} size="sm" onClick={onToggle}>
+            <Button variant={employee.status === 'active' ? 'secondary' : 'primary'} size="sm" onClick={onToggle}>
               {employee.status === 'active' ? 'Disable Access' : 'Enable Access'}
             </Button>
+            {onDelete && (
+              <Button variant="danger" size="sm" icon={Trash2} onClick={onDelete}>
+                Delete Employee
+              </Button>
+            )}
           </div>
         )}
       </div>

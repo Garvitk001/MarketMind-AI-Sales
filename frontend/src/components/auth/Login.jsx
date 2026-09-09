@@ -19,7 +19,8 @@ import {
   User,
   Building2,
   Store,
-  ArrowLeft
+  ArrowLeft,
+  KeyRound
 } from 'lucide-react';
 
 export const Login = ({ initialMode = 'login', initialRole = 'owner', isDeveloperPortal = false, onBack }) => {

@@ -2,7 +2,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import (
@@ -14,8 +14,9 @@ from app.api.dependencies import (
 from app.core.config import settings
 from app.core.permissions import Permissions
 from app.core.security import hash_password, random_token, utcnow
-from app.models.auth import SecurityTokenPurpose
+from app.models.auth import AuthSession, SecurityToken, SecurityTokenPurpose
 from app.models.identity import Role, RoleCode, Store, User, UserStatus
+from app.models.performance import EmployeeTarget
 from app.schemas.auth import DevelopmentTokenResponse
 from app.schemas.common import MessageResponse
 from app.schemas.users import (
@@ -26,7 +27,9 @@ from app.schemas.users import (
     ProfileUpdate,
     RoleChangeRequest,
     RoleResponse,
+    StoreCreate,
     StoreResponse,
+    StoreUpdate,
     UserInvitationRequest,
     UserResponse,
 )
@@ -517,6 +520,207 @@ def reissue_employee_invitation(
         ),
         token=token,
     )
+
+
+@router.get(
+    "/{user_id}/invitation-token",
+    response_model=DevelopmentTokenResponse,
+)
+def get_employee_invitation_token(
+    user_id: UUID,
+    db: DBSession,
+    actor: User = Depends(require_permissions(Permissions.USERS_MANAGE)),
+):
+    require_business_owner(actor)
+    target = db.get(User, user_id)
+    if not target or target.tenant_id != actor.tenant_id:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.role.code not in OWNER_ASSIGNABLE_ROLES:
+        raise HTTPException(status_code=403, detail="Only employee accounts have invitation tokens")
+    if target.status == UserStatus.ACTIVE and target.email_verified_at:
+        raise HTTPException(status_code=400, detail="This account has already been activated and verified")
+
+    token = issue_security_token(db, user=target, purpose=SecurityTokenPurpose.INVITATION)
+    db.commit()
+    return DevelopmentTokenResponse(
+        message=f"Active invitation token for {target.full_name}",
+        token=token,
+    )
+
+
+@router.delete(
+    "/{user_id}",
+    response_model=MessageResponse,
+    dependencies=[Depends(require_reauthentication)],
+)
+def delete_employee(
+    user_id: UUID,
+    request: Request,
+    db: DBSession,
+    actor: User = Depends(require_permissions(Permissions.USERS_MANAGE)),
+):
+    require_business_owner(actor)
+    target = db.get(User, user_id)
+    if not target or target.tenant_id != actor.tenant_id:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.id == actor.id:
+        raise HTTPException(status_code=422, detail="You cannot delete your own Business Owner account")
+    if target.role.code not in OWNER_ASSIGNABLE_ROLES:
+        raise HTTPException(status_code=403, detail="Only employee accounts can be deleted")
+
+    target_name = target.full_name
+    target_email = target.email
+    db.execute(delete(AuthSession).where(AuthSession.user_id == target.id))
+    db.execute(delete(SecurityToken).where(SecurityToken.user_id == target.id))
+    db.execute(delete(EmployeeTarget).where(EmployeeTarget.employee_id == target.id))
+
+    db.delete(target)
+    record_audit(
+        db,
+        event_type="owner.employee_deleted",
+        request=request,
+        tenant_id=actor.tenant_id,
+        actor_user_id=actor.id,
+        target_type="user",
+        target_id=str(user_id),
+        details={"deleted_employee_name": target_name, "deleted_employee_email": target_email},
+    )
+    db.commit()
+    return MessageResponse(message=f"Employee '{target_name}' deleted successfully.")
+
+
+@router.post(
+    "/stores",
+    response_model=StoreResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_reauthentication)],
+)
+def create_store(
+    payload: StoreCreate,
+    request: Request,
+    db: DBSession,
+    actor: User = Depends(require_permissions(Permissions.USERS_MANAGE)),
+):
+    require_business_owner(actor)
+    code = payload.code.strip().upper()
+    existing = db.scalar(
+        select(Store).where(Store.tenant_id == actor.tenant_id, Store.code == code)
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail=f"A store with code '{code}' already exists")
+
+    store = Store(
+        tenant_id=actor.tenant_id,
+        name=payload.name.strip(),
+        code=code,
+        timezone=payload.timezone.strip() if payload.timezone else actor.timezone,
+        is_active=True,
+    )
+    db.add(store)
+    db.flush()
+    record_audit(
+        db,
+        event_type="owner.store_created",
+        request=request,
+        tenant_id=actor.tenant_id,
+        actor_user_id=actor.id,
+        target_type="store",
+        target_id=str(store.id),
+        details={"name": store.name, "code": store.code},
+    )
+    db.commit()
+    db.refresh(store)
+    return StoreResponse.model_validate(store)
+
+
+@router.patch(
+    "/stores/{store_id}",
+    response_model=StoreResponse,
+    dependencies=[Depends(require_reauthentication)],
+)
+def update_store(
+    store_id: UUID,
+    payload: StoreUpdate,
+    request: Request,
+    db: DBSession,
+    actor: User = Depends(require_permissions(Permissions.USERS_MANAGE)),
+):
+    require_business_owner(actor)
+    store = db.get(Store, store_id)
+    if not store or store.tenant_id != actor.tenant_id:
+        raise HTTPException(status_code=404, detail="Store not found")
+
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=422, detail="At least one store field is required")
+
+    if "name" in changes and changes["name"]:
+        store.name = changes["name"].strip()
+    if "code" in changes and changes["code"]:
+        code = changes["code"].strip().upper()
+        existing = db.scalar(
+            select(Store).where(
+                Store.tenant_id == actor.tenant_id, Store.code == code, Store.id != store.id
+            )
+        )
+        if existing:
+            raise HTTPException(status_code=409, detail=f"A store with code '{code}' already exists")
+        store.code = code
+    if "timezone" in changes and changes["timezone"]:
+        store.timezone = changes["timezone"].strip()
+    if "is_active" in changes and changes["is_active"] is not None:
+        store.is_active = changes["is_active"]
+
+    record_audit(
+        db,
+        event_type="owner.store_updated",
+        request=request,
+        tenant_id=actor.tenant_id,
+        actor_user_id=actor.id,
+        target_type="store",
+        target_id=str(store.id),
+        details={"changes": changes},
+    )
+    db.commit()
+    db.refresh(store)
+    return StoreResponse.model_validate(store)
+
+
+@router.delete(
+    "/stores/{store_id}",
+    response_model=MessageResponse,
+    dependencies=[Depends(require_reauthentication)],
+)
+def delete_store(
+    store_id: UUID,
+    request: Request,
+    db: DBSession,
+    actor: User = Depends(require_permissions(Permissions.USERS_MANAGE)),
+):
+    require_business_owner(actor)
+    store = db.get(Store, store_id)
+    if not store or store.tenant_id != actor.tenant_id:
+        raise HTTPException(status_code=404, detail="Store not found")
+
+    total_stores = db.scalar(
+        select(func.count(Store.id)).where(Store.tenant_id == actor.tenant_id, Store.is_active.is_(True))
+    )
+    if total_stores <= 1:
+        raise HTTPException(status_code=422, detail="Your business must maintain at least one active store location")
+
+    store.is_active = False
+    record_audit(
+        db,
+        event_type="owner.store_deactivated",
+        request=request,
+        tenant_id=actor.tenant_id,
+        actor_user_id=actor.id,
+        target_type="store",
+        target_id=str(store.id),
+        details={"name": store.name, "code": store.code},
+    )
+    db.commit()
+    return MessageResponse(message=f"Store '{store.name}' deactivated successfully.")
 
 
 @router.patch(
