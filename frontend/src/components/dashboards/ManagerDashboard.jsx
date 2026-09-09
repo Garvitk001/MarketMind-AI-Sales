@@ -30,7 +30,16 @@ import {
   Edit2,
   Trash2,
   PackagePlus,
+  Sparkles,
+  PieChart as PieIcon,
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+} from 'recharts';
 
 const getProductUnitPrice = (productOrItem) => {
   if (!productOrItem) return 499.0;
@@ -199,6 +208,29 @@ export const ManagerDashboard = () => {
   const categoriesList = useMemo(() => {
     const set = new Set(inventoryItems.map((i) => i.category));
     return ['all', ...Array.from(set)];
+  }, [inventoryItems]);
+
+  const categoryInventoryData = useMemo(() => {
+    const catMap = {};
+    const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#3b82f6'];
+    let totalVal = 0;
+
+    inventoryItems.forEach((item) => {
+      const cat = item.category || 'General';
+      if (!catMap[cat]) {
+        catMap[cat] = { name: cat, value: 0, itemsCount: 0, totalUnits: 0 };
+      }
+      catMap[cat].itemsCount += 1;
+      catMap[cat].totalUnits += item.stock;
+      catMap[cat].value += item.totalValueNum;
+      totalVal += item.totalValueNum;
+    });
+
+    return Object.values(catMap).map((c, idx) => ({
+      ...c,
+      color: COLORS[idx % COLORS.length],
+      percentage: totalVal > 0 ? Math.round((c.value / totalVal) * 100) : 0,
+    })).sort((a, b) => b.value - a.value);
   }, [inventoryItems]);
 
   const lowStockAlerts = useMemo(() => {
@@ -631,6 +663,94 @@ export const ManagerDashboard = () => {
           })}
         </div>
       </Card>
+
+      {/* Category Stock & Valuation Distribution Section */}
+      {categoryInventoryData.length > 0 && (
+        <Card hoverEffect={false} className="border-slate-200 dark:border-slate-800">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <PieIcon className="w-5 h-5 text-indigo-500" />
+                  <span>Category Stock &amp; Valuation Distribution</span>
+                  <Badge variant="info">Store Catalog</Badge>
+                </CardTitle>
+                <CardDescription>
+                  Warehouse inventory valuation and SKU distribution across active product categories
+                </CardDescription>
+              </div>
+              <div className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg">
+                Categories: <strong className="text-indigo-600 dark:text-indigo-400">{categoryInventoryData.length}</strong>
+              </div>
+            </div>
+          </CardHeader>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center pt-1">
+            <div className="lg:col-span-5 flex flex-col items-center justify-center">
+              <div className="h-56 w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryInventoryData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={80}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {categoryInventoryData.map((entry, index) => (
+                        <Cell key={`manager-cat-${index}`} fill={entry.color} stroke="transparent" />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid #334155', color: '#fff' }}
+                      formatter={(val, name) => [`₹${Number(val).toLocaleString('en-IN')}`, name]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                  <span className="text-[11px] font-semibold text-slate-400">Stock Assets</span>
+                  <span className="text-sm font-bold text-slate-900 dark:text-white">
+                    ₹{categoryInventoryData.reduce((acc, curr) => acc + curr.value, 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-7 space-y-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {categoryInventoryData.map((cat, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/50"
+                  >
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[110px]" title={cat.name}>
+                          {cat.name}
+                        </span>
+                      </div>
+                      <span className="font-bold text-slate-900 dark:text-white">{cat.percentage}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mb-1.5">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${Math.max(cat.percentage, 4)}%`, backgroundColor: cat.color }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                      <span>{cat.itemsCount} SKUs ({cat.totalUnits} units)</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">₹{cat.value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Low Stock Urgent Callout Priority Queue */}
       {stockAlertsEnabled && lowStockAlerts.length > 0 && (

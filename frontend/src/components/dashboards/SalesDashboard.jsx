@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { MOCK_SALES_DATA } from '../../data/mockData';
 import { Card, CardHeader, CardTitle, CardDescription } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -21,6 +21,7 @@ import {
   PlusCircle,
   Zap,
   Copy,
+  PieChart as PieIcon,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -30,11 +31,14 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 
 export const SalesDashboard = ({ onNavigate }) => {
   const { addToast } = useToast();
-  const { salesDashboard } = useData();
+  const { salesDashboard, inventoryItems, salesTransactions } = useData();
   const { kpis: mockKpis, pipelineStages, recentLeads } = MOCK_SALES_DATA;
 
   const money = (value) =>
@@ -42,6 +46,54 @@ export const SalesDashboard = ({ onNavigate }) => {
       maximumFractionDigits: 2,
       minimumFractionDigits: 2,
     })}`;
+
+  const categorySalesData = useMemo(() => {
+    const catMap = {};
+    const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#3b82f6'];
+    let totalCatRevenue = 0;
+
+    (inventoryItems || []).forEach((item) => {
+      const cat = item.product?.category || item.category || 'General Wholesale';
+      if (!catMap[cat]) {
+        catMap[cat] = { name: cat, value: 0, count: 0 };
+      }
+    });
+
+    (salesTransactions || []).forEach((tx) => {
+      const amt = Number(tx.total_amount || 0);
+      if (tx.items && tx.items.length > 0) {
+        tx.items.forEach((line) => {
+          const inv = (inventoryItems || []).find((i) => i.product_id === line.product_id || i.id === line.product_id);
+          const cat = inv?.product?.category || inv?.category || 'General Wholesale';
+          if (!catMap[cat]) catMap[cat] = { name: cat, value: 0, count: 0 };
+          const lineAmt = Number(line.line_amount || (line.unit_price * line.quantity) || 0);
+          catMap[cat].value += lineAmt;
+          catMap[cat].count += Number(line.quantity || 1);
+          totalCatRevenue += lineAmt;
+        });
+      } else {
+        const primaryCat = Object.keys(catMap)[0] || 'General Wholesale';
+        if (!catMap[primaryCat]) catMap[primaryCat] = { name: primaryCat, value: 0, count: 0 };
+        catMap[primaryCat].value += amt;
+        catMap[primaryCat].count += 1;
+        totalCatRevenue += amt;
+      }
+    });
+
+    if (totalCatRevenue === 0) {
+      return [
+        { name: 'POS Hardware', value: 65000, percentage: 45, color: '#6366f1', count: 12 },
+        { name: 'Thermal Supplies', value: 45000, percentage: 31, color: '#10b981', count: 48 },
+        { name: 'Barcode Scanners', value: 35200, percentage: 24, color: '#f59e0b', count: 15 },
+      ];
+    }
+
+    return Object.values(catMap).map((c, idx) => ({
+      ...c,
+      color: COLORS[idx % COLORS.length],
+      percentage: totalCatRevenue > 0 ? Math.round((c.value / totalCatRevenue) * 100) : 0,
+    })).sort((a, b) => b.value - a.value);
+  }, [inventoryItems, salesTransactions]);
 
   const revenueVal = salesDashboard ? Number(salesDashboard.revenue.value || 0) : 145200;
   const targetVal = 150000;
@@ -271,10 +323,10 @@ export const SalesDashboard = ({ onNavigate }) => {
         </div>
       </Card>
 
-      {/* Revenue Trend Chart & AI Lead Opportunities */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Revenue Trend & Category Contribution Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Personal Sales Bar Chart */}
-        <Card hoverEffect={false} className="lg:col-span-1">
+        <Card hoverEffect={false}>
           <CardHeader>
             <div>
               <CardTitle className="flex items-center gap-2">
@@ -299,6 +351,79 @@ export const SalesDashboard = ({ onNavigate }) => {
             </ResponsiveContainer>
           </div>
         </Card>
+
+        {/* Category Sales Contribution Pie Chart */}
+        <Card hoverEffect={false}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <PieIcon className="w-5 h-5 text-indigo-500" />
+                  <span>Category Sales Contribution</span>
+                </CardTitle>
+                <CardDescription>Revenue distribution across product catalog categories</CardDescription>
+              </div>
+              <Badge variant="info">Category Share</Badge>
+            </div>
+          </CardHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center pt-2">
+            <div className="sm:col-span-5 flex flex-col items-center justify-center">
+              <div className="h-56 w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categorySalesData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {categorySalesData.map((entry, index) => (
+                        <Cell key={`sales-cat-${index}`} fill={entry.color} stroke="transparent" />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid #334155', color: '#fff' }}
+                      formatter={(val, name) => [money(val), name]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                  <span className="text-[10px] font-semibold text-slate-400">Total Sales</span>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    {money(categorySalesData.reduce((acc, curr) => acc + curr.value, 0))}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="sm:col-span-7 space-y-2">
+              {categorySalesData.slice(0, 4).map((cat, idx) => (
+                <div key={idx} className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/50">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[120px]" title={cat.name}>
+                        {cat.name}
+                      </span>
+                    </div>
+                    <span className="font-bold text-slate-900 dark:text-white">{cat.percentage}%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 h-1 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${Math.max(cat.percentage, 4)}%`, backgroundColor: cat.color }} />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                    <span>{cat.count ? `${cat.count} units sold` : 'Active category'}</span>
+                    <span className="font-semibold text-slate-600 dark:text-slate-300">{money(cat.value)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      </div>
 
         {/* High-Probability AI B2B Opportunities */}
         <Card hoverEffect={false} className="lg:col-span-2">
@@ -360,7 +485,6 @@ export const SalesDashboard = ({ onNavigate }) => {
             ))}
           </div>
         </Card>
-      </div>
 
       {/* AI Cross-Sell Bundling Cheat-Sheet */}
       <Card hoverEffect={false} className="border-l-4 border-l-indigo-500 bg-gradient-to-r from-indigo-50/40 to-violet-50/40 dark:from-indigo-950/20 dark:to-violet-950/20">
