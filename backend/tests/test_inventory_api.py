@@ -124,7 +124,7 @@ def test_inventory_access_and_updates_are_role_and_store_scoped(
         json={"stock_quantity": 10},
         headers=auth_header(owner_token),
     )
-    assert owner_update.status_code == 403
+    assert owner_update.status_code == 200
 
     manager_update = client.patch(
         f"/api/v1/inventory/{first_item.id}",

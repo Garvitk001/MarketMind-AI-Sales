@@ -2,7 +2,36 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.identity import Store, Tenant
+from app.models.inventory import Inventory, Product
 from tests.conftest import auth_header, create_user, login
+
+
+def add_inventory(
+    db: Session,
+    *,
+    tenant: Tenant,
+    store: Store,
+    sku: str,
+    stock_quantity: int,
+) -> Inventory:
+    product = Product(
+        tenant_id=tenant.id,
+        sku=sku,
+        name=sku,
+        category="Demo",
+    )
+    db.add(product)
+    db.flush()
+    item = Inventory(
+        tenant_id=tenant.id,
+        store_id=store.id,
+        product_id=product.id,
+        stock_quantity=stock_quantity,
+        reorder_level=5,
+    )
+    db.add(item)
+    db.commit()
+    return item
 
 
 def test_anomaly_detection_endpoints(
@@ -11,6 +40,7 @@ def test_anomaly_detection_endpoints(
     tenant: Tenant,
     store: Store,
 ):
+    add_inventory(db, tenant=tenant, store=store, sku="ANOM-01", stock_quantity=0)
     owner = create_user(
         db,
         tenant=tenant,
@@ -40,12 +70,14 @@ def test_anomaly_detection_endpoints(
     assert res_resp.status_code == 200
     assert res_resp.json()["status"] == "resolved"
 
+
 def test_anomaly_severity_filter(
     client: TestClient,
     db: Session,
     tenant: Tenant,
     store: Store,
 ):
+    add_inventory(db, tenant=tenant, store=store, sku="ANOM-CRIT", stock_quantity=0)
     owner = create_user(
         db,
         tenant=tenant,

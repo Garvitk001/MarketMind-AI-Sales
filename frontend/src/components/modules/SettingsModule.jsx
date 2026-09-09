@@ -101,6 +101,7 @@ export const SettingsModule = ({ onNavigate }) => {
   const [savingBiz, setSavingBiz] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
   const [savedBizAt, setSavedBizAt] = useState(null);
+  const [previewAvatar, setPreviewAvatar] = useState(null);
   const [uploading, setUploading] = useState(false);
 
   const [bizForm, setBizForm] = useState({
@@ -237,6 +238,8 @@ export const SettingsModule = ({ onNavigate }) => {
       addToast('Profile photo must be 2 MB or smaller', 'error');
       return;
     }
+    const previewUrl = URL.createObjectURL(file);
+    setPreviewAvatar(previewUrl);
     setUploading(true);
     try {
       await uploadAvatar(file);
@@ -250,6 +253,7 @@ export const SettingsModule = ({ onNavigate }) => {
 
   const removeAvatar = async () => {
     setUploading(true);
+    setPreviewAvatar(null);
     try {
       await deleteAvatar();
       addToast('Profile photo removed successfully', 'success');
@@ -300,7 +304,7 @@ export const SettingsModule = ({ onNavigate }) => {
           <div className="flex flex-col gap-6 bg-gradient-to-r from-indigo-950 via-slate-900 to-violet-950 p-6 text-white sm:flex-row sm:items-center border-b border-indigo-800/40">
             <div className="relative">
               <ProfileAvatar
-                profile={{ ...profile, avatar_emoji: form.avatar_emoji }}
+                profile={{ ...profile, avatar_url: previewAvatar || profile?.avatar_url, avatar_emoji: form.avatar_emoji }}
                 fallbackImage={currentRole.avatar}
                 className="h-24 w-24 rounded-2xl border-2 border-white/30 text-5xl shadow-xl"
               />

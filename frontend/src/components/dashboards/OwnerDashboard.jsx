@@ -199,19 +199,25 @@ export const OwnerDashboard = ({ onNavigate }) => {
     }
   };
 
-  const revenueTrend = (salesDashboard?.trend || []).length
-    ? salesDashboard.trend.map((point) => ({
-        date: point.date,
-        name: point.date,
-        revenue: Number(point.revenue || 0)
-      }))
-    : hasBusinessData
-      ? (MOCK_OWNER_DATA.revenueTrend || []).map((point) => ({
-          date: point.date || point.name,
-          name: point.date || point.name,
+  const rawSeries = salesDashboard?.revenue_series || salesDashboard?.trend || [];
+  const revenueTrend = rawSeries.length
+    ? rawSeries.map((point) => {
+        let label = point.date || point.name;
+        try {
+          if (point.date && String(point.date).includes('-')) {
+            label = new Date(`${point.date}T00:00:00`).toLocaleDateString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+            });
+          }
+        } catch {}
+        return {
+          date: label,
+          name: label,
           revenue: Number(point.revenue || 0)
-        }))
-      : [];
+        };
+      })
+    : [];
 
   const creditAgingData = outstandingCredit > 0
     ? [
@@ -416,6 +422,21 @@ export const OwnerDashboard = ({ onNavigate }) => {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center text-[11px] pt-1">
+              <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <p className="font-semibold">0–7 Days</p>
+                <p className="font-bold">{money(creditAgingData[0]?.amount || 0)}</p>
+              </div>
+              <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                <p className="font-semibold">8–15 Days</p>
+                <p className="font-bold">{money(creditAgingData[1]?.amount || 0)}</p>
+              </div>
+              <div className="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                <p className="font-semibold">15+ Days</p>
+                <p className="font-bold">{money(creditAgingData[2]?.amount || 0)}</p>
+              </div>
             </div>
 
             <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">

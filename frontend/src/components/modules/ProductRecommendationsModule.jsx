@@ -1091,11 +1091,14 @@ export const ProductRecommendationsModule = () => {
                     className="w-full pl-9 pr-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                   >
                     <option value="">All Accounts</option>
-                    {customerOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.tier ? `(${c.tier})` : ''}
-                      </option>
-                    ))}
+                    {customerOptions.map((c) => {
+                      const accountName = c.company_name || c.name || c.contact_name || c.external_customer_id || `Client #${String(c.id).slice(0, 6)}`;
+                      return (
+                        <option key={c.id} value={c.id}>
+                          {accountName} {c.tier ? `(${c.tier})` : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
@@ -1114,11 +1117,15 @@ export const ProductRecommendationsModule = () => {
                     className="w-full pl-9 pr-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                   >
                     <option value="">All Base SKUs</option>
-                    {productOptions.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.id} – {item.name}
-                      </option>
-                    ))}
+                    {productOptions.map((item) => {
+                      const sku = item.sku || item.product?.sku || item.id;
+                      const name = item.name || item.product?.name || 'Product';
+                      return (
+                        <option key={sku} value={sku}>
+                          {sku} – {name}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>

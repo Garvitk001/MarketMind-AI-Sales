@@ -975,6 +975,16 @@ export const ManagerDashboard = () => {
       >
         {selectedPoItem && (
           <div className="space-y-4 text-xs">
+            <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/60 text-slate-700 dark:text-slate-300 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-indigo-600 dark:text-indigo-400">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>What is a PO (Purchase Order)?</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
+                A <strong>Purchase Order (PO)</strong> is an official commercial contract sent to wholesale manufacturers or distributors authorizing stock replenishment before goods are shipped to your store.
+              </p>
+            </div>
+
             <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
               <div className="flex justify-between font-bold">
                 <span>SKU: {selectedPoItem.id}</span>

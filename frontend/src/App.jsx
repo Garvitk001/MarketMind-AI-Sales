@@ -238,7 +238,7 @@ const MainAppContent = () => {
       {/* Floating Persistent AI Copilot Trigger Button (Bottom-Right Corner) */}
       <button
         onClick={() => setIsAiModalOpen(true)}
-        className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-700 text-white font-bold text-xs shadow-2xl shadow-indigo-600/50 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-indigo-400/30 group"
+        className="fixed bottom-6 right-6 z-30 px-4 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-700 text-white font-bold text-xs shadow-2xl shadow-indigo-600/50 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-indigo-400/30 group"
         title="Open AI Business Copilot"
       >
         <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center">

@@ -298,15 +298,21 @@ def delete_inventory_product(
     sku = item.product.sku if item.product else "UNKNOWN"
     name = item.product.name if item.product else "UNKNOWN"
 
-    db.delete(item)
-    db.flush()
-
-    # Check if this product has other inventory entries
-    other_inv = db.scalar(select(Inventory).where(Inventory.product_id == product_id))
-    if not other_inv:
+    try:
+        # Check if product is referenced in other inventories
         prod = db.get(Product, product_id)
         if prod:
-            db.delete(prod)
+            prod.is_active = False
+        db.delete(item)
+        db.flush()
+    except Exception:
+        db.rollback()
+        # Fallback: zero out stock and deactivate
+        item = db.get(Inventory, inventory_id)
+        if item:
+            item.stock_quantity = 0
+            if item.product:
+                item.product.is_active = False
 
     record_audit(
         db,

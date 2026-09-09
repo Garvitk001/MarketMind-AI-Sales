@@ -197,9 +197,14 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
           currency: 'INR',
           timezone: 'Asia/Kolkata'
         });
-        setVerifyToken(response.token || '');
-        setIsVerifyModalOpen(true);
-        addToast(response.message, 'success');
+        if (response.token) {
+          setVerifyToken(response.token);
+          setIsVerifyModalOpen(true);
+          addToast(response.message || 'Registration successful. Enter token / OTP to verify.', 'success');
+        } else {
+          setAuthMode('login');
+          addToast(response.message || 'Registration successful! Your account is active. You can now log in.', 'success');
+        }
       }
     } catch (error) {
       setErrorMessage(error.message || 'Unable to complete authentication.');
@@ -246,7 +251,7 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
     setIsVerifying(true);
     try {
       const response = await verifyEmail(verifyToken.trim());
-      addToast(response.message, 'success');
+      addToast(response?.message || 'Email verified successfully!', 'success');
       setIsVerifyModalOpen(false);
       setAuthMode('login');
       setVerifyToken('');
@@ -254,7 +259,13 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
       setBusinessName('');
       setStoreName('');
     } catch (error) {
-      addToast(error.message, 'danger');
+      if (error.message?.toLowerCase().includes('already') || error.message?.toLowerCase().includes('verified')) {
+        addToast('Account is active. Please log in.', 'success');
+        setIsVerifyModalOpen(false);
+        setAuthMode('login');
+      } else {
+        addToast(error.message || 'Invalid verification token.', 'danger');
+      }
     } finally {
       setIsVerifying(false);
     }

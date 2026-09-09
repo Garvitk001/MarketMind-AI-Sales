@@ -230,8 +230,8 @@ export const SalesModule = () => {
           body: JSON.stringify({
             external_reference: payload.external_reference,
             occurred_at: payload.occurred_at,
-            store_id: profile.store_id,
-            currency: form.currency.toUpperCase(),
+            store_id: profile?.store_id || user?.store_id || undefined,
+            currency: (form.currency || 'INR').toUpperCase(),
             payment_method: form.paymentMethod,
             customer_reference: custRef || null,
             order_discount: Number(form.orderDiscount || 0),

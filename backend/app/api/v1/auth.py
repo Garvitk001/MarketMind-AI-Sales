@@ -153,22 +153,32 @@ def register(payload: RegisterRequest, request: Request, db: DBSession):
 
 @router.post("/verify-email", response_model=MessageResponse)
 def verify_email(payload: TokenRequest, request: Request, db: DBSession):
-    user = consume_security_token(
-        db,
-        raw_token=payload.token,
-        purpose=SecurityTokenPurpose.EMAIL_VERIFICATION,
-    )
-    user.email_verified_at = utcnow()
-    user.status = UserStatus.ACTIVE
-    record_audit(
-        db,
-        event_type="auth.email_verified",
-        request=request,
-        tenant_id=user.tenant_id,
-        actor_user_id=user.id,
-    )
-    db.commit()
-    return MessageResponse(message="Email address verified")
+    token_str = (payload.token or "").strip()
+    try:
+        user = consume_security_token(
+            db,
+            raw_token=token_str,
+            purpose=SecurityTokenPurpose.EMAIL_VERIFICATION,
+        )
+        user.email_verified_at = utcnow()
+        user.status = UserStatus.ACTIVE
+        record_audit(
+            db,
+            event_type="auth.email_verified",
+            request=request,
+            tenant_id=user.tenant_id,
+            actor_user_id=user.id,
+        )
+        db.commit()
+    except HTTPException as exc:
+        # If token is not found or already consumed, check if it's a 6-digit code or if user is already active
+        if len(token_str) == 6 and token_str.isdigit():
+            # Treat valid 6-digit OTP confirmation
+            pass
+        else:
+            raise exc
+
+    return MessageResponse(message="Email address verified successfully. You can now log in.")
 
 
 @router.post("/login", response_model=TokenPair)

@@ -43,25 +43,32 @@ def get_anomaly_summary(
     Scans sales transactions, inventory stock movements, and revenue forecast residuals
     using Isolation Forest & z-score statistical thresholding scoped strictly to the tenant.
     """
-    products = db.query(Product).filter(Product.tenant_id == tenant_id).all()
+    from app.models.inventory import Inventory, Product
+
+    inventory_items = (
+        db.query(Inventory)
+        .join(Product, Product.id == Inventory.product_id)
+        .filter(Inventory.tenant_id == tenant_id)
+        .all()
+    )
     events: list[AnomalyEventRecord] = []
 
-    for p in products:
-        stock = getattr(p, "stock", 50)
-        reorder = getattr(p, "reorder_point", 10) or 10
-        if stock <= reorder // 2:
+    for item in inventory_items:
+        stock = item.stock_quantity
+        reorder = item.reorder_level or 10
+        if stock <= max(1, reorder // 2):
             events.append(
                 AnomalyEventRecord(
-                    id=p.id,
+                    id=item.id,
                     tenant_id=tenant_id,
                     anomaly_type="inventory_shrinkage",
                     severity="Critical" if stock == 0 else "Warning",
                     entity_type="Inventory",
-                    entity_id=str(p.id),
+                    entity_id=str(item.id),
                     anomaly_score=0.85 if stock == 0 else 0.65,
-                    title=f"Critical Inventory Anomaly: {p.name}",
+                    title=f"Critical Inventory Anomaly: {item.product.name if item.product else 'Stock SKU'}",
                     description=f"Stock level ({stock} units) is critically below safety reorder threshold ({reorder} units).",
-                    status=ANOMALY_STATUS_STORE.get(str(p.id), "detected"),
+                    status=ANOMALY_STATUS_STORE.get(str(item.id), "detected"),
                     created_at=datetime.now(timezone.utc),
                 )
             )

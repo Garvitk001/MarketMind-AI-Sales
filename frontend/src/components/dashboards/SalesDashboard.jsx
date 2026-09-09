@@ -77,18 +77,24 @@ export const SalesDashboard = ({ onNavigate }) => {
     },
   };
 
-  const revenueTrend = (salesDashboard?.revenue_series || [
-    { date: '2026-09-01', revenue: 18500 },
-    { date: '2026-09-02', revenue: 24200 },
-    { date: '2026-09-03', revenue: 31000 },
-    { date: '2026-09-04', revenue: 28500 },
-  ]).map((point) => ({
-    date: new Date(`${point.date}T00:00:00`).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-    }),
-    revenue: Number(point.revenue),
-  }));
+  const rawSeries = salesDashboard?.revenue_series || [];
+  const revenueTrend = rawSeries.length
+    ? rawSeries.map((point) => {
+        let label = point.date;
+        try {
+          if (point.date && String(point.date).includes('-')) {
+            label = new Date(`${point.date}T00:00:00`).toLocaleDateString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+            });
+          }
+        } catch {}
+        return {
+          date: label,
+          revenue: Number(point.revenue || 0),
+        };
+      })
+    : [];
 
   const handleContactLead = (name, method, contact) => {
     if (method === 'Phone Call') {

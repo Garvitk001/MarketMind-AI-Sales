@@ -15,10 +15,10 @@ class SalesLineItemCreate(BaseModel):
 
 
 class SalesTransactionCreate(BaseModel):
-    store_id: UUID
+    store_id: UUID | None = None
     external_reference: str | None = Field(default=None, max_length=80)
-    occurred_at: datetime
-    currency: str = Field(min_length=3, max_length=3)
+    occurred_at: datetime | None = None
+    currency: str = Field(default="INR", min_length=3, max_length=3)
     total_amount: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2)
     item_count: int | None = Field(default=None, gt=0, le=10000)
     items: list[SalesLineItemCreate] = Field(default_factory=list, max_length=100)

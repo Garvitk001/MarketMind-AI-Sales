@@ -66,11 +66,17 @@ def create_transaction(
     db: DBSession,
     user: User = Depends(require_permissions(Permissions.SALES_CREATE)),
 ):
-    store = db.get(Store, payload.store_id)
+    target_store_id = payload.store_id or user.store_id
+    if not target_store_id:
+        target_store_id = db.scalar(select(Store.id).where(Store.tenant_id == user.tenant_id))
+    if not target_store_id:
+        raise HTTPException(status_code=422, detail="No active store found for this tenant")
+    store = db.get(Store, target_store_id)
     if not store or store.tenant_id != user.tenant_id:
         raise HTTPException(status_code=422, detail="Store does not belong to this tenant")
     if user.store_id and user.store_id != store.id:
         raise HTTPException(status_code=403, detail="Transaction is outside your store scope")
+    occurred_at = payload.occurred_at or datetime.now(UTC)
     if payload.external_reference and db.scalar(
         select(SalesTransaction.id).where(
             SalesTransaction.tenant_id == user.tenant_id,
@@ -120,7 +126,7 @@ def create_transaction(
         if unavailable:
             raise HTTPException(
                 status_code=422,
-                detail=f"Products are not stocked at this store: {', '.join(unavailable)}",
+                detail=f"Products not stocked in this store: {', '.join(unavailable)}",
             )
         insufficient = [
             (
@@ -154,14 +160,14 @@ def create_transaction(
                 .order_by(Customer.created_at)
                 .limit(1)
             )
-            recency = max(0, (datetime.now(UTC).date() - payload.occurred_at.date()).days)
+            recency = max(0, (datetime.now(UTC).date() - occurred_at.date()).days)
             if customer is None:
                 customer = Customer(
                     tenant_id=user.tenant_id,
                     assigned_seller_id=user.id,
                     source_system="manual_pos",
                     external_customer_id=payload.customer_reference.strip(),
-                    last_purchase=payload.occurred_at,
+                    last_purchase=occurred_at,
                     order_count=0,
                     item_quantity=0,
                     total_revenue=Decimal("0"),
@@ -188,7 +194,7 @@ def create_transaction(
             seller_id=user.id,
             source_system="manual_pos",
             external_reference=payload.external_reference,
-            occurred_at=payload.occurred_at,
+            occurred_at=occurred_at,
             currency=payload.currency.upper(),
             total_amount=total,
             item_count=sum(item.quantity for item in payload.items),
@@ -219,7 +225,7 @@ def create_transaction(
         if customer:
             customer.assigned_seller_id = user.id
             customer.last_purchase = max(
-                as_utc(customer.last_purchase), as_utc(payload.occurred_at)
+                as_utc(customer.last_purchase), as_utc(occurred_at)
             )
             customer.order_count += 1
             customer.item_quantity += transaction.item_count
