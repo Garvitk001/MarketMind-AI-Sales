@@ -95,4 +95,20 @@ describe('TeamManagementModule', () => {
       expect(screen.getByText('Export Team Report (CSV)')).toBeInTheDocument()
     })
   })
+
+  it('opens employee edit and analyse modal when clicking Edit & Analyse button', async () => {
+    render(<TeamManagementModule />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit & Analyse')).toBeInTheDocument()
+    })
+
+    screen.getByText('Edit & Analyse').click()
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit Employee Profile & Store Location Permissions')).toBeInTheDocument()
+      expect(screen.getByText('Save Details')).toBeInTheDocument()
+      expect(screen.getByText('Delete Employee')).toBeInTheDocument()
+    })
+  })
 })

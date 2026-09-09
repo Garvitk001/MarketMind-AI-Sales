@@ -1137,12 +1137,12 @@ const PerformanceDetail = ({
               This employee account has been created. The employee must activate their account on the login page using their one-time invitation token.
             </p>
           </div>
-          {isOwner && onReissueToken && (
+          {isOwner && onViewOrReissueToken && (
             <Button
               size="sm"
               variant="outline"
               icon={KeyRound}
-              onClick={onReissueToken}
+              onClick={onViewOrReissueToken}
               className="bg-white dark:bg-slate-900 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 shrink-0 font-semibold"
             >
               Get / Reissue Token
