@@ -535,11 +535,6 @@ def get_employee_invitation_token(
     target = db.get(User, user_id)
     if not target or target.tenant_id != actor.tenant_id:
         raise HTTPException(status_code=404, detail="User not found")
-    if target.role.code not in OWNER_ASSIGNABLE_ROLES:
-        raise HTTPException(status_code=403, detail="Only employee accounts have invitation tokens")
-    if target.status == UserStatus.ACTIVE and target.email_verified_at:
-        raise HTTPException(status_code=400, detail="This account has already been activated and verified")
-
     token = issue_security_token(db, user=target, purpose=SecurityTokenPurpose.INVITATION)
     db.commit()
     return DevelopmentTokenResponse(
