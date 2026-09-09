@@ -212,6 +212,10 @@ export const OwnerDashboard = ({ onNavigate }) => {
 
   // Dynamic Product Category Sales & Stock Distribution tailored to this specific Business Owner
   const categorySalesData = useMemo(() => {
+    if ((!inventoryItems || inventoryItems.length === 0) && (!salesTransactions || salesTransactions.length === 0)) {
+      return [];
+    }
+
     const catMap = {};
     const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#3b82f6'];
     let totalCatRevenue = 0;
@@ -245,9 +249,9 @@ export const OwnerDashboard = ({ onNavigate }) => {
       }
     });
 
-    if (totalCatRevenue === 0) {
+    if (totalCatRevenue === 0 && Object.keys(catMap).length > 0) {
       Object.keys(catMap).forEach((cat) => {
-        const invUnits = catMap[cat].units || 10;
+        const invUnits = catMap[cat].units || 1;
         const estimatedVal = invUnits * 250;
         catMap[cat].value = estimatedVal;
         totalCatRevenue += estimatedVal;
@@ -259,14 +263,6 @@ export const OwnerDashboard = ({ onNavigate }) => {
       color: COLORS[idx % COLORS.length],
       percentage: totalCatRevenue > 0 ? Math.round((c.value / totalCatRevenue) * 100) : 0,
     }));
-
-    if (result.length === 0) {
-      return (MOCK_OWNER_DATA.categoryDistribution || [
-        { name: 'POS Hardware', value: 45000, percentage: 45, color: '#6366f1' },
-        { name: 'Thermal Supplies', value: 30000, percentage: 30, color: '#10b981' },
-        { name: 'Barcode Scanners', value: 25000, percentage: 25, color: '#f59e0b' },
-      ]);
-    }
 
     return result.sort((a, b) => b.value - a.value);
   }, [inventoryItems, salesTransactions]);
@@ -563,73 +559,107 @@ export const OwnerDashboard = ({ onNavigate }) => {
           </div>
         </CardHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center pt-2">
-          {/* Pie Chart */}
-          <div className="lg:col-span-5 flex flex-col items-center justify-center">
-            <div className="h-64 w-full relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categorySalesData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={65}
-                    outerRadius={95}
-                    paddingAngle={3}
-                    dataKey="value"
+        {categorySalesData.length === 0 ? (
+          <div className="p-8 my-2 flex flex-col items-center justify-center text-center space-y-3.5 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-sm">
+              <Package className="w-6 h-6" />
+            </div>
+            <div className="max-w-md space-y-1">
+              <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">No Product Categories or Transactions Recorded</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Live revenue and catalog contribution breakdown across distinct product categories will appear once you add opening inventory or record sales orders.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => onNavigate?.('onboarding')}
+                icon={PackagePlus}
+                className="text-xs font-semibold shadow-md shadow-indigo-600/20"
+              >
+                Set Up Product Catalog
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigate?.('inventory')}
+                icon={Store}
+                className="text-xs font-semibold"
+              >
+                Go to Inventory
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center pt-2">
+            {/* Pie Chart */}
+            <div className="lg:col-span-5 flex flex-col items-center justify-center">
+              <div className="h-64 w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categorySalesData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={95}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {categorySalesData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="transparent" />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid #334155', color: '#fff' }}
+                      formatter={(val, name) => [money(val), name]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Donut Center Label */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                  <span className="text-xs font-semibold text-slate-400">Total Analyzed</span>
+                  <span className="text-base font-bold text-slate-900 dark:text-white">
+                    {money(categorySalesData.reduce((acc, curr) => acc + curr.value, 0))}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Category List & Progress Bars */}
+            <div className="lg:col-span-7 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {categorySalesData.map((cat, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/50 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all"
                   >
-                    {categorySalesData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} stroke="transparent" />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid #334155', color: '#fff' }}
-                    formatter={(val, name) => [money(val), name]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              {/* Donut Center Label */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                <span className="text-xs font-semibold text-slate-400">Total Analyzed</span>
-                <span className="text-base font-bold text-slate-900 dark:text-white">
-                  {money(categorySalesData.reduce((acc, curr) => acc + curr.value, 0))}
-                </span>
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[120px]" title={cat.name}>
+                          {cat.name}
+                        </span>
+                      </div>
+                      <span className="font-bold text-slate-900 dark:text-white">{cat.percentage}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mb-2">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.max(cat.percentage, 4)}%`, backgroundColor: cat.color }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                      <span>{cat.skus ? `${cat.skus} SKUs` : `${cat.units || 0} units`}</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">{money(cat.value)}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-
-          {/* Category List & Progress Bars */}
-          <div className="lg:col-span-7 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {categorySalesData.map((cat, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/50 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all"
-                >
-                  <div className="flex items-center justify-between text-xs mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[120px]" title={cat.name}>
-                        {cat.name}
-                      </span>
-                    </div>
-                    <span className="font-bold text-slate-900 dark:text-white">{cat.percentage}%</span>
-                  </div>
-                  <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mb-2">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${Math.max(cat.percentage, 4)}%`, backgroundColor: cat.color }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                    <span>{cat.skus ? `${cat.skus} SKUs` : `${cat.units || 0} units`}</span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">{money(cat.value)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        )}
       </Card>
 
       {/* Individual Sales Executive Sales & Real-Time Performance Section */}

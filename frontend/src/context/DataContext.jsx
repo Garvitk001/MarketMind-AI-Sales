@@ -27,17 +27,56 @@ export const DataProvider = ({ children }) => {
   });
 
   const refresh = async (requestedRange = salesDateRange) => {
-    if (!isAuthenticated || !access) return;
-    setData((current) => ({ ...current, isLoading: true, apiError: null }));
+    if (!isAuthenticated || !access) {
+      setData({
+        salesDashboard: null,
+        salesTransactions: [],
+        inventorySummary: null,
+        inventoryItems: [],
+        customerSummary: null,
+        customers: [],
+        customerSegmentSummary: null,
+        customerSegments: [],
+        users: [],
+        apiError: null,
+        isLoading: false
+      });
+      return;
+    }
+
+    setData((current) => ({
+      salesDashboard: null,
+      salesTransactions: [],
+      inventorySummary: null,
+      inventoryItems: [],
+      customerSummary: null,
+      customers: [],
+      customerSegmentSummary: null,
+      customerSegments: [],
+      users: [],
+      isLoading: true,
+      apiError: null
+    }));
+
     const modules = moduleCodes(access);
     const requests = [];
-    const assign = {};
+    const assign = {
+      salesDashboard: null,
+      salesTransactions: [],
+      inventorySummary: null,
+      inventoryItems: [],
+      customerSummary: null,
+      customers: [],
+      customerSegmentSummary: null,
+      customerSegments: [],
+      users: []
+    };
 
     if (modules.has('sales')) {
       const hasManualRange = requestedRange?.from && requestedRange?.to;
-      const preferenceDays = currentRole.id === 'owner'
+      const preferenceDays = currentRole?.id === 'owner'
         ? profile?.role_preferences?.default_period || '30'
-        : currentRole.id === 'sales'
+        : currentRole?.id === 'sales'
           ? profile?.role_preferences?.sales_period || '30'
           : '30';
       const params = hasManualRange
@@ -47,43 +86,63 @@ export const DataProvider = ({ children }) => {
         api(`/dashboard/sales?${params}`)
           .then((value) => {
             assign.salesDashboard = value;
-            if (!hasManualRange) {
+            if (!hasManualRange && value?.date_from && value?.date_to) {
               setSalesDateRange({ from: value.date_from.slice(0, 10), to: value.date_to.slice(0, 10) });
             }
+          })
+          .catch(() => {
+            assign.salesDashboard = null;
           })
       );
       requests.push(
         api('/sales/transactions?limit=200')
-          .then((value) => { assign.salesTransactions = value.items; })
+          .then((value) => { assign.salesTransactions = value.items || []; })
+          .catch(() => { assign.salesTransactions = []; })
       );
     }
     if (modules.has('inventory')) {
-      requests.push(api('/inventory/summary').then((value) => { assign.inventorySummary = value; }));
-      requests.push(api('/inventory?limit=200').then((value) => { assign.inventoryItems = value.items; }));
+      requests.push(
+        api('/inventory/summary')
+          .then((value) => { assign.inventorySummary = value; })
+          .catch(() => { assign.inventorySummary = null; })
+      );
+      requests.push(
+        api('/inventory?limit=200')
+          .then((value) => { assign.inventoryItems = value.items || []; })
+          .catch(() => { assign.inventoryItems = []; })
+      );
     }
     if (modules.has('customer_segments')) {
       const segmentModule = (access.modules || []).find((module) => module.code === 'customer_segments');
-      requests.push(api('/customers/summary').then((value) => { assign.customerSummary = value; }));
+      requests.push(
+        api('/customers/summary')
+          .then((value) => { assign.customerSummary = value; })
+          .catch(() => { assign.customerSummary = null; })
+      );
       requests.push(
         api('/customer-segments/summary')
           .then((value) => { assign.customerSegmentSummary = value; })
-          .catch((error) => {
-            if (error.status !== 404) throw error;
-          })
+          .catch(() => { assign.customerSegmentSummary = null; })
       );
       if (segmentModule?.access !== 'summary') {
-        requests.push(api('/customers?limit=200').then((value) => { assign.customers = value.items; }));
+        requests.push(
+          api('/customers?limit=200')
+            .then((value) => { assign.customers = value.items || []; })
+            .catch(() => { assign.customers = []; })
+        );
         requests.push(
           api('/customer-segments?limit=200')
-            .then((value) => { assign.customerSegments = value.items; })
-            .catch((error) => {
-              if (error.status !== 404) throw error;
-            })
+            .then((value) => { assign.customerSegments = value.items || []; })
+            .catch(() => { assign.customerSegments = []; })
         );
       }
     }
     if (modules.has('team_management')) {
-      requests.push(api('/users?limit=200').then((value) => { assign.users = value.items || value; }));
+      requests.push(
+        api('/users?limit=200')
+          .then((value) => { assign.users = value.items || value || []; })
+          .catch(() => { assign.users = []; })
+      );
     }
 
     const results = await Promise.allSettled(requests);
@@ -99,9 +158,9 @@ export const DataProvider = ({ children }) => {
   useEffect(() => {
     setSalesDateRange(DEFAULT_SALES_DATE_RANGE);
     refresh(DEFAULT_SALES_DATE_RANGE);
-    // Role and default-period changes reset the dashboard to the saved preference.
+    // Refresh whenever authentication status, role, tenant, or profile preferences change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, access?.role, profile?.role_preferences?.default_period, profile?.role_preferences?.sales_period]);
+  }, [isAuthenticated, access?.role, profile?.tenant_id, profile?.id, profile?.email, profile?.role_preferences?.default_period, profile?.role_preferences?.sales_period]);
 
   const applySalesDateRange = async (nextRange) => {
     setSalesDateRange(nextRange);

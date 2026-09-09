@@ -28,8 +28,9 @@ import { Modal } from '../ui/Modal';
 const importTypes = [
   {
     id: 'products',
+    stepNumber: '1',
     title: 'Product Catalog',
-    description: 'SKU, product name, category, style, size, and color details.',
+    description: 'Master list of product SKUs, names, categories, styles, sizes, and colors. Import this first.',
     columns: 'sku,name,category,style,size,color',
     sample:
       'sku,name,category,style,size,color\n' +
@@ -42,8 +43,9 @@ const importTypes = [
   },
   {
     id: 'inventory',
+    stepNumber: '2',
     title: 'Opening Inventory',
-    description: 'Opening stock quantity and reorder thresholds for catalog SKUs.',
+    description: 'Opening warehouse stock quantities and reorder thresholds linked to catalog SKUs.',
     columns: 'sku,stock_quantity,reorder_level',
     sample:
       'sku,stock_quantity,reorder_level\n' +
@@ -57,8 +59,9 @@ const importTypes = [
   },
   {
     id: 'customers',
+    stepNumber: '3',
     title: 'Customer Directory',
-    description: 'Import B2B customer accounts, purchase history metrics, and recency.',
+    description: 'B2B client directory with historical purchase volume, total lifetime revenue, and recency.',
     columns: 'customer_id,last_purchase,order_count,item_quantity,total_revenue,recency_days',
     sample:
       'customer_id,last_purchase,order_count,item_quantity,total_revenue,recency_days\n' +
@@ -72,8 +75,9 @@ const importTypes = [
   },
   {
     id: 'sales',
+    stepNumber: '4',
     title: 'Sales Transactions',
-    description: 'Customer & product-linked sales history used for Customer 360 & forecasts.',
+    description: 'Historical sales transactions connecting customer accounts with product SKUs for AI forecasts.',
     columns: 'order_id,order_date,customer_id,sku,quantity,amount,currency',
     sample:
       'order_id,order_date,customer_id,sku,quantity,amount,currency\n' +
@@ -391,31 +395,41 @@ export const BusinessSetupModule = ({ onNavigate }) => {
           {importTypes.map((type) => {
             const Icon = type.icon;
             return (
-              <div key={type.id} className="rounded-2xl border border-slate-200 p-5 dark:border-slate-800 space-y-3">
+              <div key={type.id} className="rounded-2xl border border-slate-200 p-5 dark:border-slate-800 space-y-3.5 bg-slate-50/50 dark:bg-slate-900/40 hover:border-indigo-400 dark:hover:border-indigo-600 transition shadow-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300">
-                    <Icon className="h-5 w-5" />
+                  <div className="flex items-center gap-2.5">
+                    <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block">
+                        Step {type.stepNumber}
+                      </span>
+                      <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">{type.title}</h3>
+                    </div>
                   </div>
-                  <Badge variant="info">CSV Template</Badge>
+                  <Badge variant="info" className="text-[10px] font-semibold">CSV Ready</Badge>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-slate-100">{type.title}</h3>
-                  <p className="mt-1 text-sm text-slate-500">{type.description}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{type.description}</p>
+                <div className="rounded-xl bg-slate-100 dark:bg-slate-950/80 p-2.5 border border-slate-200/60 dark:border-slate-800 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Expected Column Headers</span>
+                  <p className="break-all font-mono text-[11px] text-indigo-600 dark:text-indigo-300 font-medium">
+                    {type.columns}
+                  </p>
                 </div>
-                <p className="break-all rounded-lg bg-slate-50 p-2 font-mono text-[10px] text-slate-500 dark:bg-slate-800/60">
-                  Required: {type.columns}
-                </p>
-                <div className="flex gap-2 pt-1">
-                  <Button size="sm" variant="secondary" icon={Download} onClick={() => downloadTemplate(type)}>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button size="sm" variant="secondary" icon={Download} onClick={() => downloadTemplate(type)} className="text-xs font-semibold">
                     Download Template
                   </Button>
                   <Button
                     size="sm"
+                    variant="primary"
                     icon={Upload}
                     isLoading={working && selectedImport?.id === type.id}
                     onClick={() => chooseFile(type)}
+                    className="text-xs font-semibold shadow-md shadow-indigo-600/20"
                   >
-                    Upload CSV
+                    Upload &amp; Preview
                   </Button>
                 </div>
               </div>

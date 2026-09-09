@@ -401,7 +401,7 @@ export const CustomersModule = () => {
           </div>
           <div className="mt-3">
             <h3 className="text-base font-bold text-emerald-400 truncate">
-              {customerKpis.topClient?.company_name || 'Apex Retail Stores'}
+              {customerKpis.topClient?.company_name || (customerKpis.totalAccounts > 0 ? `Client ${customerKpis.topClient?.external_customer_id || '1'}` : 'None Registered')}
             </h3>
             <p className="text-[10px] text-emerald-300 font-bold mt-1">
               Rev: {money(customerKpis.topClient?.total_revenue || 0)}
@@ -411,12 +411,12 @@ export const CustomersModule = () => {
       </div>
 
       {/* Segment Distribution Profiles */}
-      {summary && (
+      {summary && segmentOptions.length > 0 && customerKpis.totalAccounts > 0 ? (
         <Card hoverEffect={false}>
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">B2B Customer Behavioral Segments</h3>
-              <p className="text-xs text-slate-500">Commercial buyer groupings based on purchase frequency & credit volume</p>
+              <p className="text-xs text-slate-500">Commercial buyer groupings based on purchase frequency &amp; credit volume</p>
             </div>
           </div>
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
@@ -442,6 +442,29 @@ export const CustomersModule = () => {
                 </p>
               </button>
             ))}
+          </div>
+        </Card>
+      ) : (
+        <Card hoverEffect={false} className="border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
+          <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-400" />
+                B2B Customer Behavioral Segments
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                AI segmentation clusters (Champions, Loyal Accounts, Growth Prospects) will activate automatically as B2B client accounts and invoices are registered.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={PlusCircle}
+              onClick={() => setIsAddModalOpen(true)}
+              className="text-xs font-semibold shrink-0"
+            >
+              Register First Client
+            </Button>
           </div>
         </Card>
       )}
