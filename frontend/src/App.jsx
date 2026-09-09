@@ -15,6 +15,7 @@ import { ToastContainer } from './components/common/ToastContainer';
 import { AiAssistantModal } from './components/common/AiAssistantModal';
 import { EmailVerificationModal } from './components/common/EmailVerificationModal';
 import { UIComponentLibrary } from './components/common/UIComponentLibrary';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 import { OwnerDashboard } from './components/dashboards/OwnerDashboard';
 import { ManagerDashboard } from './components/dashboards/ManagerDashboard';
@@ -34,8 +35,8 @@ import { AnomalyDetectionModule } from './components/modules/AnomalyDetectionMod
 import { AiChatModule } from './components/modules/AiChatModule';
 
 const MainAppContent = () => {
-  const { isAuthenticated, isInitializing, currentRole, profile } = useAuth();
-  const { setThemePreference } = useTheme();
+  const { isAuthenticated, isInitializing, currentRole = {}, profile } = useAuth() || {};
+  const { setThemePreference } = useTheme() || {};
 
   const isDevUrl = () => {
     if (typeof window === 'undefined') return false;
@@ -92,7 +93,7 @@ const MainAppContent = () => {
   useEffect(() => {
     setActiveTab('dashboard');
     setIsMobileMenuOpen(false);
-  }, [currentRole.id]);
+  }, [currentRole?.id]);
 
   useEffect(() => {
     if (profile?.theme_preference) setThemePreference(profile.theme_preference);
@@ -142,7 +143,7 @@ const MainAppContent = () => {
 
   // Render role-specific dashboard when activeTab is 'dashboard'
   const renderDashboardView = () => {
-    switch (currentRole.id) {
+    switch (currentRole?.id) {
       case 'owner':
         return <OwnerDashboard onNavigate={setActiveTab} />;
       case 'manager':
@@ -166,7 +167,7 @@ const MainAppContent = () => {
       case 'ai_models':
       case 'errors':
       case 'system':
-        return currentRole.id === 'admin'
+        return currentRole?.id === 'admin'
           ? <AdminDashboard activeTab={activeTab} onTabChange={setActiveTab} />
           : renderDashboardView();
       case 'sales':
@@ -199,7 +200,7 @@ const MainAppContent = () => {
   };
 
   return (
-    <div className={`marketmind-workspace role-${currentRole.id} ${profile?.dashboard_density === 'compact' ? 'density-compact' : ''} min-h-screen bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 transition-colors duration-300 flex`}>
+    <div className={`marketmind-workspace role-${currentRole?.id || 'owner'} ${profile?.dashboard_density === 'compact' ? 'density-compact' : ''} min-h-screen bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 transition-colors duration-300 flex`}>
       {/* Collapsible Responsive Sidebar */}
       <Sidebar
         activeTab={activeTab}
@@ -228,7 +229,9 @@ const MainAppContent = () => {
         }`}
       >
         <div className="max-w-7xl mx-auto space-y-6 animate-fade-in min-w-0">
-          {renderMainContent()}
+          <ErrorBoundary componentName={activeTab}>
+            {renderMainContent()}
+          </ErrorBoundary>
         </div>
       </main>
 
@@ -260,16 +263,18 @@ const MainAppContent = () => {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <ToastProvider>
-          <AuthProvider>
-            <DataProvider>
-              <MainAppContent />
-            </DataProvider>
-          </AuthProvider>
-        </ToastProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <LanguageProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <DataProvider>
+                <MainAppContent />
+              </DataProvider>
+            </AuthProvider>
+          </ToastProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

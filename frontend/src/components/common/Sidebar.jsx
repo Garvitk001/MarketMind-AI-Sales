@@ -23,11 +23,11 @@ import {
 import { useLanguage } from '../../context/LanguageContext';
 
 export const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, isMobileMenuOpen, setIsMobileMenuOpen }) => {
-  const { currentRole, access, profile, logout } = useAuth();
+  const { currentRole = {}, access, profile, logout } = useAuth() || {};
   const { t } = useLanguage();
 
   const allowedModules = new Set((access?.modules || []).map((module) => module.code));
-  const navItems = currentRole.id === 'admin'
+  const navItems = currentRole?.id === 'admin'
     ? [
         { id: 'businesses', label: 'Businesses & Teams', icon: Building2, badge: 'Owners', badgeColor: 'bg-purple-500/20 text-purple-300' },
         { id: 'auth_logs', label: 'Auth & Login Logs', icon: Clock, badge: 'Timing', badgeColor: 'bg-blue-500/20 text-blue-300' },
@@ -39,14 +39,14 @@ export const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, 
     : [
         { id: 'dashboard', label: t('Dashboard'), icon: LayoutDashboard, badge: null },
         ...(allowedModules.has('sales') ? [{ id: 'sales', label: t('Sales Deals'), icon: ShoppingBag, badge: null }] : []),
-        ...(allowedModules.has('inventory') ? [{ id: 'inventory', label: t('Inventory'), icon: PackageCheck, badge: currentRole.id === 'manager' ? t('Stock Alerts') : null, badgeColor: 'bg-rose-500 text-white' }] : []),
+        ...(allowedModules.has('inventory') ? [{ id: 'inventory', label: t('Inventory'), icon: PackageCheck, badge: currentRole?.id === 'manager' ? t('Stock Alerts') : null, badgeColor: 'bg-rose-500 text-white' }] : []),
         ...(allowedModules.has('customer_segments') ? [{ id: 'customers', label: t('Customers'), icon: Users, badge: null }] : []),
         { id: 'recommendations', label: t('AI Recommender'), icon: Sparkles, badge: t('Boost'), badgeColor: 'bg-indigo-500/20 text-indigo-300' },
         { id: 'churn', label: t('Churn Analytics'), icon: Users, badge: t('Retention'), badgeColor: 'bg-rose-500/20 text-rose-300' },
         { id: 'anomalies', label: t('Anomaly Alerts'), icon: Activity, badge: t('Safeguard'), badgeColor: 'bg-amber-500/20 text-amber-300' },
         ...(allowedModules.has('business_setup') ? [{ id: 'setup', label: t('Business Setup'), icon: ClipboardCheck, badge: 'Start', badgeColor: 'bg-amber-500/15 text-amber-300' }] : []),
         ...(allowedModules.has('team_management') ? [{ id: 'team', label: t('Team & Performance'), icon: Users, badge: 'Owner', badgeColor: 'bg-indigo-500/20 text-indigo-300' }] : []),
-        ...(allowedModules.has('team_performance') ? [{ id: 'team', label: currentRole.id === 'sales' ? 'My Performance' : t('Team & Performance'), icon: Activity, badge: currentRole.id === 'manager' ? 'Store' : 'Personal', badgeColor: 'bg-emerald-500/15 text-emerald-300' }] : []),
+        ...(allowedModules.has('team_performance') ? [{ id: 'team', label: currentRole?.id === 'sales' ? 'My Performance' : t('Team & Performance'), icon: Activity, badge: currentRole?.id === 'manager' ? 'Store' : 'Personal', badgeColor: 'bg-emerald-500/15 text-emerald-300' }] : []),
         ...(allowedModules.has('forecasts') ? [{ id: 'reports', label: t('Reports & Forecasts'), icon: BarChart3, badge: 'Live', badgeColor: 'bg-emerald-500/15 text-emerald-300' }] : []),
         { id: 'settings', label: t('Settings'), icon: Settings, badge: null }
       ];

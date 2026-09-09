@@ -23,7 +23,7 @@ export const Navbar = ({ isCollapsed, onOpenAiModal, onNavigate, onToggleMobileM
   const { isDarkMode, toggleTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
   const { addToast } = useToast();
-  const { salesTransactions, inventoryItems, customers } = useData();
+  const { salesTransactions = [], inventoryItems = [], customers = [] } = useData() || {};
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -33,30 +33,30 @@ export const Navbar = ({ isCollapsed, onOpenAiModal, onNavigate, onToggleMobileM
   const [notifications, setNotifications] = useState([]);
   const [readNotificationIds, setReadNotificationIds] = useState(new Set());
 
-  const unreadCount = notifications.filter((notification) => !readNotificationIds.has(notification.id)).length;
+  const unreadCount = (notifications || []).filter((notification) => !readNotificationIds.has(notification.id)).length;
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (query.length < 2) return [];
     const results = [
-      ...salesTransactions.map((transaction) => ({
+      ...(salesTransactions || []).map((transaction) => ({
         id: transaction.id,
         type: 'Transaction',
-        label: transaction.external_reference || transaction.id.slice(0, 8),
-        detail: `${transaction.source_system} • ₹${Number(transaction.total_amount).toLocaleString('en-IN')}`,
+        label: transaction.external_reference || String(transaction.id || '').slice(0, 8),
+        detail: `${transaction.source_system || 'POS'} • ₹${Number(transaction.total_amount || 0).toLocaleString('en-IN')}`,
         tab: 'sales'
       })),
-      ...inventoryItems.map((item) => ({
+      ...(inventoryItems || []).map((item) => ({
         id: item.id,
         type: 'Inventory',
-        label: item.product.name,
-        detail: `${item.product.sku} • ${item.stock_quantity} units`,
+        label: item.product?.name || item.name || 'Product Item',
+        detail: `${item.product?.sku || item.sku || 'SKU'} • ${item.stock_quantity ?? item.stock ?? 0} units`,
         tab: 'inventory'
       })),
-      ...customers.map((customer) => ({
+      ...(customers || []).map((customer) => ({
         id: customer.id,
         type: 'Customer',
-        label: customer.external_customer_id,
-        detail: `${customer.order_count} orders • ₹${Number(customer.total_revenue).toLocaleString('en-IN')}`,
+        label: customer.external_customer_id || customer.full_name || customer.name || 'Customer',
+        detail: `${customer.order_count || 0} orders • ₹${Number(customer.total_revenue || 0).toLocaleString('en-IN')}`,
         tab: 'customers'
       }))
     ];
