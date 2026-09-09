@@ -20,11 +20,14 @@ import {
 } from 'lucide-react';
 import { churnService } from '../../services/churnService';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
 export const ChurnPredictionModule = () => {
+  const { currentRole } = useAuth();
+  const isSales = currentRole?.id === 'sales';
   const [summary, setSummary] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -209,11 +212,15 @@ export const ChurnPredictionModule = () => {
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-semibold">
             <UserX className="w-3.5 h-3.5 text-rose-400" />
-            <span>AI Customer Retention &amp; Winback Hub</span>
+            <span>{isSales ? 'Client Retention & Win-Back Hub' : 'AI Customer Retention & Winback Hub'}</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">At-Risk Account Retention Analytics</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isSales ? 'Client Churn & Win-Back Playbooks' : 'At-Risk Account Retention Analytics'}
+          </h1>
           <p className="text-sm text-indigo-200">
-            Identify slipping accounts early, calculate revenue at risk, and launch 1-click email or WhatsApp winback offers.
+            {isSales
+              ? 'Identify slipping wholesale clients assigned to your pipeline, execute re-engagement scripts, and protect commission revenue.'
+              : 'Identify slipping accounts early, calculate revenue at risk, and launch 1-click email or WhatsApp winback offers.'}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -420,8 +427,10 @@ export const ChurnPredictionModule = () => {
                 </tr>
               ) : filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-8 text-center text-slate-500">
-                    No at-risk customer accounts match the selected filter.
+                  <td colSpan="7" className="py-8 text-center text-slate-500 text-xs">
+                    {isSales
+                      ? 'No at-risk client accounts found. All customer buying intervals and re-order cycles are healthy.'
+                      : 'No at-risk customer accounts match the selected filter.'}
                   </td>
                 </tr>
               ) : (

@@ -1177,7 +1177,7 @@ export const ReportsModule = ({ onNavigate }) => {
               >
                 View Targets
               </Button>
-              {onNavigate && (
+              {onNavigate && roleId !== 'sales' && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -1185,6 +1185,16 @@ export const ReportsModule = ({ onNavigate }) => {
                   onClick={() => onNavigate('setup')}
                 >
                   Open Business Setup
+                </Button>
+              )}
+              {onNavigate && roleId === 'sales' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={ArrowUpRight}
+                  onClick={() => onNavigate('sales')}
+                >
+                  Create Tax Invoice
                 </Button>
               )}
             </div>
@@ -1196,13 +1206,15 @@ export const ReportsModule = ({ onNavigate }) => {
       <Modal
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
-        title="Sales History Required to Unlock AI Forecasting"
+        title={roleId === 'sales' ? 'Sales History Required for Personal AI Forecasting' : 'Sales History Required to Unlock AI Forecasting'}
       >
         <div className="space-y-4">
           <div className="flex items-start gap-3 p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-200">
             <Sparkles className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
             <p className="text-xs leading-relaxed">
-              Your business workspace is completely fresh and isolated. AI forecasting algorithms and customer segmentation models require recorded transaction history before generating commercial projections.
+              {roleId === 'sales'
+                ? 'Your personal sales forecasting model requires recorded completed customer transactions to train predictive volume curves and revenue projections.'
+                : 'Your business workspace is completely fresh and isolated. AI forecasting algorithms and customer segmentation models require recorded transaction history before generating commercial projections.'}
             </p>
           </div>
 
@@ -1213,21 +1225,25 @@ export const ReportsModule = ({ onNavigate }) => {
             <div className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
               <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
                 <Target className="w-4 h-4 text-indigo-500 shrink-0" />
-                <span><strong>30+ Completed Sales Transactions</strong> across at least 30 days of trading</span>
+                <span><strong>Completed Sales Invoices</strong> recorded from your client accounts</span>
               </div>
               <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
                 <Users className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span><strong>20+ Customer Accounts</strong> for behavioral clustering</span>
+                <span><strong>Active Customer Retailers</strong> with ordering transaction history</span>
               </div>
-              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
-                <Layers className="w-4 h-4 text-purple-500 shrink-0" />
-                <span><strong>Store Location & Product Catalog</strong> with live stock levels</span>
-              </div>
+              {roleId !== 'sales' && (
+                <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                  <Layers className="w-4 h-4 text-purple-500 shrink-0" />
+                  <span><strong>Store Location & Product Catalog</strong> with live stock levels</span>
+                </div>
+              )}
             </div>
           </div>
 
           <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-            Use the <strong>Business Setup</strong> hub to create store locations, invite team members, or import historical CSV business data.
+            {roleId === 'sales'
+              ? 'Create tax invoices or log completed client orders to automatically generate your personal sales projections.'
+              : 'Use the Business Setup hub to create store locations, invite team members, or import historical CSV business data.'}
           </p>
         </div>
 
@@ -1235,7 +1251,7 @@ export const ReportsModule = ({ onNavigate }) => {
           <Button variant="outline" size="sm" onClick={() => setShowHistoryModal(false)}>
             Dismiss
           </Button>
-          {onNavigate && (
+          {onNavigate && roleId !== 'sales' && (
             <Button
               variant="primary"
               size="sm"
@@ -1246,6 +1262,19 @@ export const ReportsModule = ({ onNavigate }) => {
               }}
             >
               Open Business Setup
+            </Button>
+          )}
+          {onNavigate && roleId === 'sales' && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={ArrowUpRight}
+              onClick={() => {
+                setShowHistoryModal(false);
+                onNavigate('sales');
+              }}
+            >
+              Create Tax Invoice
             </Button>
           )}
         </div>

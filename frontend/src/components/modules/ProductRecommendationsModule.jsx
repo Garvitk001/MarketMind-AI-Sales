@@ -709,9 +709,9 @@ export const ProductRecommendationsModule = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('score');
 
-  // ── Dropdown options from live API (with mock fallback)
-  const [customerOptions, setCustomerOptions] = useState(MOCK_CUSTOMERS);
-  const [productOptions, setProductOptions] = useState(MOCK_MANAGER_DATA.inventoryItems);
+  // ── Dropdown options from live API
+  const [customerOptions, setCustomerOptions] = useState([]);
+  const [productOptions, setProductOptions] = useState([]);
 
   // ── Modal state
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
@@ -732,14 +732,14 @@ export const ProductRecommendationsModule = () => {
           recommendationService.getCustomers(),
           recommendationService.getProducts(),
         ]);
-        if (custRes.status === 'fulfilled' && custRes.value?.items?.length) {
-          setCustomerOptions(custRes.value.items);
+        if (custRes.status === 'fulfilled') {
+          setCustomerOptions(custRes.value?.items || []);
         }
-        if (prodRes.status === 'fulfilled' && prodRes.value?.items?.length) {
-          setProductOptions(prodRes.value.items);
+        if (prodRes.status === 'fulfilled') {
+          setProductOptions(prodRes.value?.items || []);
         }
       } catch {
-        // Silently fall back to mock data
+        // Silently catch
       }
     };
     loadOptions();
@@ -976,7 +976,9 @@ export const ProductRecommendationsModule = () => {
         <p className="text-sm text-slate-500 dark:text-slate-400">
           {searchTerm || selectedCategory || selectedStrategy !== 'all' || selectedCustomerId || selectedSku
             ? 'No recommendations match your selected filters.'
-            : 'Recommendations are temporarily unavailable. Please try again.'}
+            : userRole === 'sales'
+            ? 'No AI cross-sell pitches available yet. Completed invoices and product catalog data will generate instant customer purchase pairings.'
+            : 'No recommendation bundles found yet. Add inventory products and sales history to unlock AI pairings.'}
         </p>
         <div className="flex items-center justify-center gap-3">
           <Button variant="outline" size="sm" onClick={resetFilters}>

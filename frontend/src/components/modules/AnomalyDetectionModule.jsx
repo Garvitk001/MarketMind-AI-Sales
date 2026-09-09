@@ -17,10 +17,13 @@ import {
 } from 'lucide-react';
 import { anomalyService } from '../../services/anomalyService';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
 export const AnomalyDetectionModule = () => {
+  const { currentRole } = useAuth();
+  const isSales = currentRole?.id === 'sales';
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState(null);
@@ -165,11 +168,15 @@ export const AnomalyDetectionModule = () => {
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/30 text-rose-200 text-xs font-semibold">
             <Activity className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
-            <span>AI Business Safeguards &amp; Fraud Telemetry</span>
+            <span>{isSales ? 'Deal & Quotation Safeguards' : 'AI Business Safeguards & Fraud Telemetry'}</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Business Safeguards &amp; Fraud Protection</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isSales ? 'Deal Anomaly & Margin Safeguard Alerts' : 'Business Safeguards & Fraud Protection'}
+          </h1>
           <p className="text-sm text-rose-200">
-            Automated safeguards scanning store transactions, inventory movements, and revenue for billing spikes &amp; leakage.
+            {isSales
+              ? 'Automated safeguards scanning deal quotations and sales invoices for abnormal discount spikes, unusual quantity deviations, and margin leakage.'
+              : 'Automated safeguards scanning store transactions, inventory movements, and revenue for billing spikes & leakage.'}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -371,8 +378,10 @@ export const AnomalyDetectionModule = () => {
               </div>
             </div>
           ) : filteredItems.length === 0 ? (
-            <div className="col-span-2 py-12 text-center text-slate-500">
-              No safeguard incident events match the selected filters.
+            <div className="col-span-2 py-12 text-center text-slate-500 text-xs">
+              {isSales
+                ? 'No deal anomalies or pricing discrepancies detected on your account. All sales quotations and transactions align with authorized pricing thresholds.'
+                : 'No safeguard incident events match the selected filters.'}
             </div>
           ) : (
             filteredItems.map((item) => (
