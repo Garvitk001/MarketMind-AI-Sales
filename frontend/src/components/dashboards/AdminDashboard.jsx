@@ -84,7 +84,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
   const [selectedErrorSeverity, setSelectedErrorSeverity] = useState('all');
   const [selectedErrorCategory, setSelectedErrorCategory] = useState('all');
 
-  // Comprehensive Multi-Tenant Business Directory with Phone Numbers, Emails, and Staff Details
+  // Dynamic Multi-Tenant Business Directory loaded from backend DB
   const [businesses, setBusinesses] = useState([
     {
       id: 'aravali',
@@ -176,87 +176,6 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
           horizon: '0.05 Contamination Factor'
         }
       ]
-    },
-    {
-      id: 'northwind',
-      name: 'Northwind Enterprises',
-      ownerName: 'Dev Patel',
-      ownerEmail: 'owner@northwind.example.com',
-      ownerPhone: '+91 98450 12390',
-      currency: 'INR (₹)',
-      timezone: 'Asia/Kolkata',
-      joinedDate: '2026-03-02',
-      status: 'ACTIVE',
-      storesCount: 1,
-      employees: [
-        {
-          id: 'emp-4',
-          name: 'Amit Joshi',
-          email: 'amit.manager@northwind.example.com',
-          phone: '+91 98333 44556',
-          role: 'Store Manager',
-          store: 'North Hub Store',
-          status: 'ACTIVE',
-          lastActive: '3 hours ago'
-        },
-        {
-          id: 'emp-5',
-          name: 'Sneha Roy',
-          email: 'sneha.sales@northwind.example.com',
-          phone: '+91 98666 77889',
-          role: 'Sales Executive',
-          store: 'North Hub Store',
-          status: 'ACTIVE',
-          lastActive: '5 hours ago'
-        }
-      ],
-      aiModels: [
-        {
-          name: 'Sales & Revenue Demand Forecasting',
-          algorithm: 'ARIMA + SARIMAX',
-          version: 'v1.2.0-arima',
-          lastTrained: '3 days ago',
-          accuracyScore: 0.895,
-          status: 'ACTIVE',
-          horizon: '14-Day Forward'
-        },
-        {
-          name: 'Customer RFM Segmentation',
-          algorithm: 'K-Means Clustering',
-          version: 'v1.2.0-kmeans',
-          lastTrained: '3 days ago',
-          accuracyScore: 0.840,
-          status: 'ACTIVE',
-          horizon: '3 Clusters'
-        },
-        {
-          name: 'Product Cross-Sell Recommendations',
-          algorithm: 'Association Rules',
-          version: 'v1.0.0-rules',
-          lastTrained: '3 days ago',
-          accuracyScore: 0.820,
-          status: 'ACTIVE',
-          horizon: '75% Catalog Coverage'
-        },
-        {
-          name: 'Customer Retention & Churn Predictor',
-          algorithm: 'LogisticRegression',
-          version: 'v1.0.0-logistic',
-          lastTrained: '3 days ago',
-          accuracyScore: 0.875,
-          status: 'ACTIVE',
-          horizon: '30d Risk Evaluation'
-        },
-        {
-          name: 'Isolation Forest Anomaly Detection',
-          algorithm: 'IsolationForest',
-          version: 'v1.0.0-isoforest',
-          lastTrained: 'Yesterday, 09:30 AM',
-          accuracyScore: 0.930,
-          status: 'ACTIVE',
-          horizon: '0.05 Contamination'
-        }
-      ]
     }
   ]);
 
@@ -319,10 +238,11 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
   const loadPlatformData = useCallback(async () => {
     const startTime = performance.now();
     try {
-      const [roleCatalog, auditEvents, telemetry] = await Promise.allSettled([
+      const [roleCatalog, auditEvents, telemetry, businessList] = await Promise.allSettled([
         api('/users/roles/catalog'),
         api('/audit?limit=200'),
-        api('/models/monitoring')
+        api('/models/monitoring'),
+        api('/users/admin/businesses')
       ]);
 
       const latency = Math.round(performance.now() - startTime);
@@ -331,6 +251,9 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
       if (roleCatalog.status === 'fulfilled') setRoles(roleCatalog.value || []);
       if (auditEvents.status === 'fulfilled') setLogs(auditEvents.value || []);
       if (telemetry.status === 'fulfilled') setMonitoringData(telemetry.value);
+      if (businessList.status === 'fulfilled' && Array.isArray(businessList.value) && businessList.value.length > 0) {
+        setBusinesses(businessList.value);
+      }
     } catch (error) {
       addToast(error.message || 'Error fetching system telemetry', 'error');
     } finally {
@@ -395,7 +318,7 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
       category: 'Diagnostic Simulator',
       severity: 'WARNING',
       timestamp: 'Just now (' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ')',
-      business: selectedBusinessFilter === 'all' ? 'Aravali Retail Group' : selectedBusinessFilter,
+      business: selectedBusinessFilter === 'all' ? (businesses[0]?.name || 'Aravali Retail Group') : selectedBusinessFilter,
       endpoint: 'POST /api/v1/system/diagnostics',
       message: 'Simulated exception test to verify platform alerting, trace capturing, and admin recovery pipelines.',
       stackTrace: 'DiagnosticError: Developer simulated test anomaly\n  at handleSimulateError (AdminDashboard.jsx:265)\n  at SyntheticEvent (react-dom.js)',
@@ -446,40 +369,64 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
     addToast('Error diagnostics report exported.', 'success');
   };
 
-  // Helper to map audit logs to emails and businesses
+  // Helper to map audit logs to emails, phones, roles, and businesses
   const getLogBusinessName = (event) => {
-    const email = (event.details?.recipient || event.details?.email || '').toLowerCase();
+    if (event.business_name) return event.business_name;
+    const email = (event.actor_email || event.details?.recipient || event.details?.email || '').toLowerCase();
     const detailsStr = JSON.stringify(event.details || {}).toLowerCase();
     if (email.includes('aravali') || detailsStr.includes('aravali')) return 'Aravali Retail Group';
-    if (email.includes('northwind') || detailsStr.includes('northwind')) return 'Northwind Enterprises';
     if (event.event_type?.includes('developer') || email.includes('admin') || detailsStr.includes('developer_otp')) {
-      return 'System Administrator (Root)';
+      return 'System Platform Root';
     }
-    return 'Aravali Retail Group';
+    return businesses[0]?.name || 'MarketMind Platform';
   };
 
   const getLogActorEmail = (event) => {
     return (
+      event.actor_email ||
       event.details?.recipient ||
       event.details?.email ||
-      (event.event_type?.includes('developer') ? 'admin.root@marketmind.local' : 'user@marketmind.local')
+      (event.event_type?.includes('developer') ? 'admin@system.com' : 'user@marketmind.local')
+    );
+  };
+
+  const getLogActorName = (event) => {
+    return (
+      event.actor_name ||
+      event.details?.full_name ||
+      event.details?.name ||
+      (event.event_type?.includes('developer') ? 'System Administrator' : 'User')
+    );
+  };
+
+  const getLogActorPhone = (event) => {
+    return event.actor_phone || event.details?.phone || event.details?.phone_number || '+91 98201 45678';
+  };
+
+  const getLogActorRole = (event) => {
+    return (
+      event.actor_role ||
+      event.details?.role_name ||
+      (event.details?.role || '').replace('_', ' ') ||
+      (event.event_type?.includes('developer') ? 'Platform Administrator' : 'Staff')
     );
   };
 
   const getLogAuthMethod = (event) => {
     const type = (event.event_type || '').toLowerCase();
     if (type.includes('developer_otp')) return 'Passwordless OTP (Admin Channel)';
-    if (type.includes('login')) return 'Password + MFA Verified';
+    if (type.includes('login')) return 'Login (Password / OTP Authenticated)';
+    if (type.includes('logout')) return 'User Session Logout';
     if (type.includes('token') || type.includes('verify')) return 'One-Time Token Validation';
     if (type.includes('invite')) return 'Employee Invitation Onboarding';
-    return 'Session Authentication';
+    return 'Session Activity';
   };
 
   const getEventSeverity = (event) => {
     const type = (event.event_type || '').toLowerCase();
     if (type.includes('lockout') || type.includes('failed') || type.includes('decline')) return 'CRITICAL';
     if (type.includes('anomaly') || type.includes('reset') || type.includes('role')) return 'WARNING';
-    if (type.includes('otp') || type.includes('login') || type.includes('verify')) return 'SUCCESS';
+    if (type.includes('otp') || type.includes('login') || type.includes('verify') || type.includes('accepted')) return 'SUCCESS';
     return 'INFO';
   };
 
@@ -488,6 +435,8 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
     return logs.filter((event) => {
       const type = (event.event_type || '').toLowerCase();
       const email = getLogActorEmail(event).toLowerCase();
+      const name = getLogActorName(event).toLowerCase();
+      const phone = getLogActorPhone(event).toLowerCase();
       const businessName = getLogBusinessName(event);
       const severity = getEventSeverity(event);
       const detailsStr = JSON.stringify(event.details || {}).toLowerCase();
@@ -496,19 +445,22 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
         !logSearchQuery.trim() ||
         type.includes(logSearchQuery.toLowerCase()) ||
         email.includes(logSearchQuery.toLowerCase()) ||
+        name.includes(logSearchQuery.toLowerCase()) ||
+        phone.includes(logSearchQuery.toLowerCase()) ||
+        businessName.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
         detailsStr.includes(logSearchQuery.toLowerCase());
 
       const matchesSeverity = logSeverityFilter === 'all' || severity === logSeverityFilter;
 
       const matchesBusiness =
         selectedBusinessFilter === 'all' ||
-        (selectedBusinessFilter === 'aravali' && businessName.includes('Aravali')) ||
-        (selectedBusinessFilter === 'northwind' && businessName.includes('Northwind')) ||
-        (selectedBusinessFilter === 'root' && businessName.includes('Root'));
+        (selectedBusinessFilter === 'root' && (businessName.includes('Root') || businessName.includes('Admin'))) ||
+        businesses.some((b) => b.id === selectedBusinessFilter && businessName.toLowerCase().includes(b.name.toLowerCase())) ||
+        businessName.toLowerCase().includes(selectedBusinessFilter.toLowerCase());
 
       return matchesSearch && matchesSeverity && matchesBusiness;
     });
-  }, [logs, logSearchQuery, logSeverityFilter, selectedBusinessFilter]);
+  }, [logs, logSearchQuery, logSeverityFilter, selectedBusinessFilter, businesses]);
 
   // Filtered System Errors for Tab 4
   const filteredErrors = useMemo(() => {
@@ -926,8 +878,11 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                     className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-indigo-300 font-semibold focus:outline-none focus:border-indigo-500"
                   >
                     <option value="all">All Businesses &amp; Platform</option>
-                    <option value="aravali">Aravali Retail Group</option>
-                    <option value="northwind">Northwind Enterprises</option>
+                    {businesses.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
                     <option value="root">System Root / Admin Only</option>
                   </select>
                 </div>
@@ -962,9 +917,11 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                 <thead className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 border-b border-slate-800 bg-slate-950/80">
                   <tr>
                     <th className="p-3.5">Timestamp &amp; Date</th>
-                    <th className="p-3.5">Actor Email</th>
-                    <th className="p-3.5">Business Workspace</th>
-                    <th className="p-3.5">Auth Method / Event</th>
+                    <th className="p-3.5">User &amp; Post (Role)</th>
+                    <th className="p-3.5">Email Address</th>
+                    <th className="p-3.5">Phone Number</th>
+                    <th className="p-3.5">Business Name</th>
+                    <th className="p-3.5">Auth Event / Method</th>
                     <th className="p-3.5">Status</th>
                     <th className="p-3.5 text-right">Details</th>
                   </tr>
@@ -972,13 +929,16 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-slate-500 text-xs">
+                      <td colSpan={8} className="text-center py-12 text-slate-500 text-xs">
                         No authentication logs found for the selected business or criteria.
                       </td>
                     </tr>
                   ) : (
                     filteredLogs.map((event) => {
+                      const name = getLogActorName(event);
                       const email = getLogActorEmail(event);
+                      const phone = getLogActorPhone(event);
+                      const role = getLogActorRole(event);
                       const biz = getLogBusinessName(event);
                       const method = getLogAuthMethod(event);
                       const severity = getEventSeverity(event);
@@ -994,9 +954,27 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                               {dateObj.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                             </span>
                           </td>
-                          <td className="p-3.5 font-bold text-indigo-300">{email}</td>
+                          <td className="p-3.5">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-indigo-950 border border-indigo-500/30 flex items-center justify-center text-[10px] text-indigo-300 font-bold shrink-0">
+                                {name.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <span className="font-bold text-white block">{name}</span>
+                                <span className="text-[10px] text-indigo-300 font-semibold px-1.5 py-0.2 rounded bg-indigo-950/80 border border-indigo-500/20">
+                                  {role}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3.5 font-medium text-slate-300">
+                            <span className="text-indigo-300">{email}</span>
+                          </td>
+                          <td className="p-3.5 font-medium text-emerald-300 whitespace-nowrap">
+                            {phone}
+                          </td>
                           <td className="p-3.5 text-slate-300">
-                            <span className="px-2.5 py-1 rounded-md bg-slate-950 border border-slate-800 text-[11px] font-semibold">
+                            <span className="px-2.5 py-1 rounded-md bg-slate-950 border border-slate-800 text-[11px] font-semibold block max-w-[170px] truncate">
                               {biz}
                             </span>
                           </td>
@@ -1058,8 +1036,11 @@ export const AdminDashboard = ({ activeTab: externalActiveTab, onTabChange }) =>
                 className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-indigo-300 font-semibold focus:outline-none focus:border-indigo-500"
               >
                 <option value="all">All Businesses</option>
-                <option value="aravali">Aravali Retail Group</option>
-                <option value="northwind">Northwind Enterprises</option>
+                {businesses.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

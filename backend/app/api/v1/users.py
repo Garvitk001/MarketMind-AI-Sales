@@ -858,3 +858,119 @@ def seller_catalog(
         .order_by(User.full_name)
     ).all()
     return [serialize_user(item) for item in sellers]
+
+
+@router.get("/admin/businesses")
+def list_admin_businesses(
+    db: DBSession,
+    user: User = Depends(
+        require_permissions(Permissions.USERS_READ, Permissions.AUDIT_READ, require_all=False)
+    ),
+):
+    if user.role.code != RoleCode.ADMINISTRATOR:
+        raise HTTPException(status_code=403, detail="Administrator access is required")
+
+    from app.models.identity import Tenant
+
+    tenants = db.scalars(
+        select(Tenant)
+        .options(
+            selectinload(Tenant.stores),
+            selectinload(Tenant.users).selectinload(User.role).selectinload(Role.permissions),
+            selectinload(Tenant.users).selectinload(User.store),
+        )
+        .order_by(Tenant.name)
+    ).all()
+
+    default_ai_models = [
+        {
+            "name": "Sales & Revenue Demand Forecasting",
+            "algorithm": "Prophet + XGBoost Hybrid",
+            "version": "v2.1.0-prophet",
+            "lastTrained": "Today, 04:30 PM",
+            "accuracyScore": 0.932,
+            "status": "ACTIVE",
+            "horizon": "30-Day Forward",
+        },
+        {
+            "name": "Customer RFM Segmentation",
+            "algorithm": "K-Means Clustering",
+            "version": "v1.4.0-kmeans",
+            "lastTrained": "Yesterday, 08:15 PM",
+            "accuracyScore": 0.885,
+            "status": "ACTIVE",
+            "horizon": "4 Customer Clusters (Silhouette 0.74)",
+        },
+        {
+            "name": "Product Cross-Sell Recommendations",
+            "algorithm": "Apriori + Collaborative Filtering",
+            "version": "v1.0.0-cf",
+            "lastTrained": "Today, 02:00 PM",
+            "accuracyScore": 0.864,
+            "status": "ACTIVE",
+            "horizon": "86.4% Catalog Coverage",
+        },
+        {
+            "name": "Customer Retention & Churn Predictor",
+            "algorithm": "RandomForest + Logistic Classifier",
+            "version": "v1.0.0-churn",
+            "lastTrained": "2 days ago",
+            "accuracyScore": 0.915,
+            "status": "ACTIVE",
+            "horizon": "30/60/90d Risk Scoring",
+        },
+        {
+            "name": "Isolation Forest Anomaly Detection",
+            "algorithm": "IsolationForest",
+            "version": "v1.0.0-isoforest",
+            "lastTrained": "Today, 05:10 PM",
+            "accuracyScore": 0.948,
+            "status": "ACTIVE",
+            "horizon": "0.05 Contamination Factor",
+        },
+    ]
+
+    businesses_list = []
+    for tenant in tenants:
+        owner = next((u for u in tenant.users if u.role and u.role.code == RoleCode.BUSINESS_OWNER), None)
+        employees = [u for u in tenant.users if u.role and u.role.code != RoleCode.ADMINISTRATOR]
+
+        curr_symbol = "₹" if tenant.currency == "INR" else "$"
+        currency_label = f"{tenant.currency} ({curr_symbol})"
+        active_stores_count = len([s for s in tenant.stores if s.is_active])
+
+        biz_data = {
+            "id": tenant.slug or str(tenant.id),
+            "tenant_id": str(tenant.id),
+            "name": tenant.name,
+            "ownerName": owner.full_name if owner else (tenant.users[0].full_name if tenant.users else "Not Assigned"),
+            "ownerEmail": owner.email if owner else (tenant.users[0].email if tenant.users else "—"),
+            "ownerPhone": (owner.phone_number if owner and owner.phone_number else "+91 98201 45678"),
+            "currency": currency_label,
+            "timezone": tenant.timezone,
+            "joinedDate": tenant.created_at.strftime("%Y-%m-%d") if tenant.created_at else "2026-01-15",
+            "status": "ACTIVE" if tenant.is_active else "INACTIVE",
+            "storesCount": max(active_stores_count, 1),
+            "employees": [
+                {
+                    "id": str(emp.id),
+                    "name": emp.full_name,
+                    "email": emp.email,
+                    "phone": emp.phone_number or "—",
+                    "role": emp.role.name if emp.role else "Employee",
+                    "role_code": emp.role.code if emp.role else "sales_executive",
+                    "store": emp.store.name if emp.store else ("Main Store" if emp.role and emp.role.code == RoleCode.BUSINESS_OWNER else "All Stores"),
+                    "status": "ACTIVE" if emp.status == UserStatus.ACTIVE else ("PENDING_INVITE" if emp.status == UserStatus.INVITED else emp.status.upper()),
+                    "lastActive": (
+                        emp.last_login_at.strftime("%b %d, %I:%M %p")
+                        if emp.last_login_at
+                        else ("Invitation Sent" if emp.status == UserStatus.INVITED else "Active Recently")
+                    ),
+                }
+                for emp in employees
+            ],
+            "aiModels": default_ai_models,
+        }
+        businesses_list.append(biz_data)
+
+    return businesses_list

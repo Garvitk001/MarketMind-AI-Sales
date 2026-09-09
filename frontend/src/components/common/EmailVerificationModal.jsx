@@ -1,24 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { ShieldCheck, Mail, KeyRound, CheckCircle2, AlertCircle, ArrowRight, Loader2, Sparkles, X } from 'lucide-react';
+import { ShieldCheck, Mail, KeyRound, CheckCircle2, AlertCircle, ArrowRight, Loader2, Sparkles, Lock } from 'lucide-react';
 
 export const EmailVerificationModal = () => {
   const { profile, api, refreshProfile } = useAuth();
   const { addToast } = useToast();
 
   const isVerified = Boolean(profile?.email_verified_at || profile?.email_verified);
+  const isAdmin = profile?.role?.code === 'administrator';
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [step, setStep] = useState('request'); // 'request' | 'verify' | 'success'
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [devOtpHint, setDevOtpHint] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // If user is already verified, do not show anything
-  if (isVerified || !profile) {
+  // If user is already verified or is administrator, do not block
+  if (isVerified || !profile || isAdmin) {
     return null;
   }
 
@@ -35,11 +34,11 @@ export const EmailVerificationModal = () => {
       }
       addToast({
         type: 'info',
-        title: 'OTP Sent',
-        message: res?.message || `6-digit OTP sent to ${profile.email}`
+        title: 'OTP Code Sent',
+        message: res?.message || `6-digit verification code sent to ${profile.email}`
       });
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to send OTP. Please try again.');
+      setErrorMsg(err.message || 'Failed to send OTP code. Please try again.');
       addToast({
         type: 'error',
         title: 'Error Sending OTP',
@@ -68,12 +67,9 @@ export const EmailVerificationModal = () => {
       addToast({
         type: 'success',
         title: 'Email Verified!',
-        message: 'Your email has been successfully verified.'
+        message: 'Your email has been verified. Welcome to your workspace!'
       });
       await refreshProfile();
-      setTimeout(() => {
-        setIsOpen(false);
-      }, 1500);
     } catch (err) {
       setErrorMsg(err.message || 'Invalid or expired OTP code.');
       addToast({
@@ -87,176 +83,177 @@ export const EmailVerificationModal = () => {
   };
 
   return (
-    <>
-      {/* Non-intrusive persistent Top Banner */}
-      {!isBannerDismissed && (
-        <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2.5 text-xs text-amber-200 flex items-center justify-between shadow-inner backdrop-blur-md">
-          <div className="flex items-center gap-2 max-w-2xl">
-            <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
-            <span>
-              <strong>Verify Your Account Email:</strong> Please verify <strong>{profile.email}</strong> to activate full business capabilities and security alerts.
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                setIsOpen(true);
-                handleRequestOtp();
-              }}
-              className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-3 py-1 rounded-md transition shadow flex items-center gap-1.5 text-xs"
-            >
-              Verify Now (OTP)
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setIsBannerDismissed(true)}
-              className="text-amber-400/70 hover:text-amber-300 transition p-1"
-              title="Dismiss for this session"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn select-none"
+      style={{ pointerEvents: 'all' }}
+    >
+      <div className="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-lg shadow-2xl p-6 sm:p-8 relative overflow-hidden text-slate-200">
+        {/* Ambient background glow */}
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Verification Modal Popup */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden text-slate-200">
-            {/* Ambient background glow */}
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+        {step === 'request' && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                <Lock className="w-6 h-6" />
+              </div>
+              <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[11px] font-bold text-amber-300 uppercase tracking-wider">
+                Mandatory Verification
+              </span>
+            </div>
 
-            <button
-              onClick={() => setIsOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="space-y-2">
+              <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                Verify Your Business Email
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                To protect your business workspace and enable sales, inventory, and forecasting features, please verify your email address:
+              </p>
+              <div className="p-3 bg-slate-950/90 border border-slate-800 rounded-xl flex items-center gap-2.5 text-xs text-indigo-300 font-semibold font-mono">
+                <Mail className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span className="truncate">{profile.email}</span>
+              </div>
+            </div>
 
-            {step === 'request' && (
-              <div className="space-y-4">
-                <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mb-2">
-                  <Mail className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl font-bold text-white">Verify Your Email Address</h3>
-                <p className="text-sm text-slate-400 leading-relaxed">
-                  We need to verify ownership of <strong>{profile.email}</strong>. We will send a secure 6-digit One-Time Password (OTP) to this address.
-                </p>
-
-                {errorMsg && (
-                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
-
-                <div className="pt-2 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsOpen(false)}
-                    className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={handleRequestOtp}
-                    className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold px-5 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 text-sm disabled:opacity-50"
-                  >
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
-                    Send 6-Digit OTP
-                  </button>
-                </div>
+            {errorMsg && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{errorMsg}</span>
               </div>
             )}
 
-            {step === 'verify' && (
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 mb-2">
-                  <KeyRound className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">Enter 6-Digit Verification Code</h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Enter the OTP code sent to <span className="text-indigo-300 font-medium">{profile.email}</span>. Valid for 10 minutes.
-                  </p>
-                </div>
-
-                {devOtpHint && (
-                  <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>Development Mode OTP: <strong>{devOtpHint}</strong></span>
-                  </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={handleRequestOtp}
+                className="w-full bg-gradient-to-r from-amber-500 via-amber-600 to-indigo-600 hover:from-amber-600 hover:to-indigo-700 text-slate-950 font-bold px-5 py-3.5 rounded-2xl shadow-xl hover:shadow-indigo-500/20 transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                    <span>Sending 6-Digit OTP...</span>
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="w-4 h-4 text-slate-950" />
+                    <span>Send Verification OTP Code</span>
+                  </>
                 )}
+              </button>
+            </div>
+            <p className="text-[11px] text-center text-slate-500">
+              A 6-digit OTP will be dispatched to your registered mailbox.
+            </p>
+          </div>
+        )}
 
-                {errorMsg && (
-                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
+        {step === 'verify' && (
+          <form onSubmit={handleVerifyOtp} className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+                <KeyRound className="w-6 h-6" />
+              </div>
+              <span className="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-[11px] font-bold text-indigo-300 uppercase tracking-wider">
+                OTP Validation
+              </span>
+            </div>
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                    One-Time Password (OTP)
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="123456"
-                    className="w-full bg-slate-800 border border-slate-700 focus:border-amber-500 rounded-xl px-4 py-3 text-center tracking-[0.5em] text-2xl font-mono text-white placeholder:text-slate-600 focus:outline-none transition"
-                    autoFocus
-                  />
-                </div>
+            <div>
+              <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                Enter 6-Digit OTP
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">
+                Enter the code sent to <strong className="text-indigo-300">{profile.email}</strong>.
+              </p>
+            </div>
 
-                <div className="flex items-center justify-between pt-2">
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={handleRequestOtp}
-                    className="text-xs text-amber-400 hover:text-amber-300 underline transition disabled:opacity-50"
-                  >
-                    Resend Code
-                  </button>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsOpen(false)}
-                      className="px-4 py-2 text-xs text-slate-400 hover:text-slate-200 transition"
-                    >
-                      Close
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isLoading || otp.length !== 6}
-                      className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold px-5 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 text-sm disabled:opacity-50"
-                    >
-                      {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                      Verify & Activate
-                    </button>
-                  </div>
-                </div>
-              </form>
-            )}
-
-            {step === 'success' && (
-              <div className="text-center py-6 space-y-3">
-                <div className="w-16 h-16 bg-emerald-500/20 border border-emerald-500/40 rounded-full flex items-center justify-center text-emerald-400 mx-auto animate-bounce">
-                  <CheckCircle2 className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-bold text-white">Email Successfully Verified!</h3>
-                <p className="text-sm text-slate-400">
-                  Your account is now fully active with full security privileges enabled.
-                </p>
+            {devOtpHint && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Verification OTP Hint: <strong className="font-mono text-sm tracking-widest text-white">{devOtpHint}</strong></span>
               </div>
             )}
+
+            {errorMsg && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                6-Digit Verification Code
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="123456"
+                className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded-2xl px-4 py-3.5 text-center tracking-[0.4em] text-2xl sm:text-3xl font-mono text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition shadow-inner"
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <button
+                type="submit"
+                disabled={isLoading || otp.length !== 6}
+                className="w-full bg-gradient-to-r from-emerald-500 to-indigo-600 hover:from-emerald-600 hover:to-indigo-700 text-white font-bold px-5 py-3.5 rounded-2xl shadow-xl transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Verifying Code...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4 text-white" />
+                    <span>Verify &amp; Unlock Dashboard</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-between text-xs pt-1">
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={handleRequestOtp}
+                  className="text-amber-400 hover:text-amber-300 underline font-semibold transition disabled:opacity-50"
+                >
+                  Resend OTP Code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('request');
+                    setOtp('');
+                    setErrorMsg('');
+                  }}
+                  className="text-slate-400 hover:text-slate-200 transition font-medium"
+                >
+                  Change Email / Retry
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+
+        {step === 'success' && (
+          <div className="text-center py-6 space-y-4">
+            <div className="w-16 h-16 bg-emerald-500/20 border border-emerald-500/40 rounded-full flex items-center justify-center text-emerald-400 mx-auto animate-bounce">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-white">Email Successfully Verified!</h3>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-sm mx-auto leading-relaxed">
+              Your account has been fully verified. Accessing your business dashboard now...
+            </p>
           </div>
-        </div>
-      )}
-    </>
+        )}
+      </div>
+    </div>
   );
 };
