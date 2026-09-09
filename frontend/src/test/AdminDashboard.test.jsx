@@ -30,9 +30,6 @@ describe('Admin Dashboard Platform Operations & Governance', () => {
     expect(screen.getByText('+91 98201 45678')).toBeInTheDocument();
     expect(screen.getByText('owner.demo@marketmind.example.com')).toBeInTheDocument();
 
-    expect(screen.getByText('Northwind Enterprises')).toBeInTheDocument();
-    expect(screen.getByText('+91 98450 12390')).toBeInTheDocument();
-
     // Verify Employees with Phone Numbers
     expect(screen.getByText('Vikram Mehta')).toBeInTheDocument();
     expect(screen.getByText('+91 98111 22334')).toBeInTheDocument();

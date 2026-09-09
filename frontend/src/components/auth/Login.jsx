@@ -5,6 +5,7 @@ import { MOCK_ROLES } from '../../data/mockData';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
+import { MarketMindLogo } from '../common/MarketMindLogo';
 import {
   Sparkles,
   Lock,
@@ -323,13 +324,12 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
 
         {/* Brand Header */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/40">
-            <Sparkles className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">MarketMind AI</h1>
-            <p className="text-xs text-indigo-300 font-medium">Enterprise Sales Intelligence Platform</p>
-          </div>
+          <MarketMindLogo
+            size={42}
+            showText={true}
+            subtitle="Indian Vyapar Sales Intelligence"
+            textClassName="text-[11px] text-amber-300 font-semibold"
+          />
         </div>
 
         {/* Hero Tagline & Features */}

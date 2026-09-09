@@ -78,6 +78,8 @@ const copy = {
   }
 };
 
+import { MarketMindLogo } from '../common/MarketMindLogo';
+
 const icons = {
   services: [BarChart3, PackageSearch, Users, ShieldCheck], difference: [IndianRupee, UserRoundCheck, Target, Sparkles],
   workflow: [Boxes, BarChart3, BrainCircuit, Zap], roles: [Building2, Store, UserRoundCheck],
@@ -85,7 +87,16 @@ const icons = {
 };
 const bars = [35, 48, 43, 66, 56, 73, 68, 84, 78, 94, 86, 100];
 
-const Logo = () => <div className="flex items-center gap-3 text-left"><span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25"><Sparkles size={20} /></span><span className="grid"><strong className="text-sm font-extrabold text-slate-900 dark:text-white">MarketMind AI</strong><small className="mt-0.5 text-[8px] font-bold uppercase tracking-[.18em] text-slate-500 dark:text-indigo-300">Business Intelligence</small></span></div>;
+const Logo = () => (
+  <div className="flex items-center gap-2 text-left">
+    <MarketMindLogo
+      size={38}
+      showText={true}
+      subtitle="Indian Vyapar Sales Intelligence"
+      textClassName="text-[9px] text-indigo-400 dark:text-indigo-300 font-bold"
+    />
+  </div>
+);
 
 const Heading = ({ data, left = false }) => <div className={`mx-auto max-w-3xl ${left ? 'text-left lg:mx-0' : 'text-center'}`}><span className="text-[11px] font-black uppercase tracking-[.2em] text-indigo-600 dark:text-indigo-300">{data[0]}</span><h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em] text-slate-950 dark:text-white sm:text-4xl">{data[1]}</h2>{data[2] && <p className="mt-4 text-sm leading-7 text-slate-600 dark:text-slate-400 sm:text-base">{data[2]}</p>}</div>;
 

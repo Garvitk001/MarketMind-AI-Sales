@@ -22,6 +22,8 @@ import {
 
 import { useLanguage } from '../../context/LanguageContext';
 
+import { MarketMindLogo } from './MarketMindLogo';
+
 export const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, isMobileMenuOpen, setIsMobileMenuOpen }) => {
   const { currentRole = {}, access, profile, logout } = useAuth() || {};
   const { t } = useLanguage();
@@ -72,17 +74,14 @@ export const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, 
       >
         {/* Top Header & Brand Logo */}
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800 shrink-0">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-500/30">
-                <Sparkles className="w-5 h-5 animate-pulse" />
-              </div>
-              {!isCollapsed && (
-                <div className="truncate">
-                  <h1 className="text-base font-bold text-white tracking-tight truncate">MarketMind AI</h1>
-                  <p className="text-[10px] text-indigo-400 font-semibold tracking-wider uppercase">Enterprise v2.4</p>
-                </div>
-              )}
+          <div className="h-16 flex items-center justify-between px-3.5 border-b border-slate-800 shrink-0">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <MarketMindLogo
+                size={34}
+                showText={!isCollapsed}
+                subtitle="Indian Vyapar AI"
+                textClassName="text-[9px] text-amber-300/90 font-bold"
+              />
             </div>
 
             <button
