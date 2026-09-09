@@ -82,6 +82,22 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
     return () => clearInterval(timer);
   }, [otpCountdown]);
 
+  React.useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tokenParam = params.get('token') || params.get('invitation_token');
+      const activateParam = params.get('activate');
+      if (tokenParam) {
+        setInvitationToken(tokenParam);
+        setIsInvitationOpen(true);
+      } else if (activateParam === 'true') {
+        setIsInvitationOpen(true);
+      }
+    } catch {
+      // Ignore URL parsing errors
+    }
+  }, []);
+
   const handleRequestDeveloperOtp = async () => {
     setIsOtpSending(true);
     setErrorMessage('');
@@ -284,10 +300,11 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
         token: invitationToken.trim(),
         password: invitationPassword
       });
-      addToast(response.message, 'success');
+      addToast(response?.message || 'Account activated successfully! Please sign in with your email and new password.', 'success');
       setIsInvitationOpen(false);
       setInvitationToken('');
       setInvitationPassword('');
+      setAuthMode('login');
     } catch (error) {
       addToast(error.message, 'danger');
     } finally {
@@ -632,13 +649,16 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
               </form>
 
               {authMode === 'login' && (
-                <button
-                  type="button"
-                  onClick={() => setIsInvitationOpen(true)}
-                  className="w-full text-center text-sm font-semibold text-indigo-400 hover:text-indigo-300"
-                >
-                  Have an employee invitation token? Activate your account
-                </button>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsInvitationOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-xs font-semibold text-indigo-300 hover:text-indigo-200 transition-colors"
+                  >
+                    <KeyRound className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Have an employee invitation token? Activate your account</span>
+                  </button>
+                </div>
               )}
 
               {/* Social Logins */}

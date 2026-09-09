@@ -208,6 +208,7 @@ def build_performance(
         employee_id=employee.id,
         full_name=employee.full_name,
         email=employee.email,
+        phone_number=employee.phone_number,
         role_code=employee.role.code,
         role_name=employee.role.name,
         store_id=employee.store_id,

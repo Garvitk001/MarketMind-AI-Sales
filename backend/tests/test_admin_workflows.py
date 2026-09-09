@@ -92,6 +92,32 @@ def test_owner_invites_and_manages_employees(
     assert changed.status_code == 200, changed.text
     assert changed.json()["role"]["code"] == "sales_executive"
 
+    # Test updating employee details: full_name, email, phone_number
+    updated = client.patch(
+        f"/api/v1/users/{manager.id}",
+        json={
+            "full_name": "Updated Manager Name",
+            "email": "updated.manager@example.com",
+            "phone_number": "+91 9876543210",
+            "role_code": "store_manager",
+            "store_id": str(store.id),
+        },
+        headers=headers,
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["full_name"] == "Updated Manager Name"
+    assert updated.json()["email"] == "updated.manager@example.com"
+    assert updated.json()["phone_number"] == "+91 9876543210"
+    assert updated.json()["role"]["code"] == "store_manager"
+
+    # Test reissuing invitation token for an employee
+    reissued = client.post(
+        f"/api/v1/users/{manager.id}/reissue-invitation",
+        headers=headers,
+    )
+    assert reissued.status_code == 200, reissued.text
+    assert reissued.json()["token"] is not None
+
     forbidden_owner_role = client.post(
         "/api/v1/users/invite",
         json={

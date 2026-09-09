@@ -23,6 +23,11 @@ import {
   FileText,
   Package,
   Clock,
+  Mail,
+  Phone,
+  KeyRound,
+  ExternalLink,
+  Save,
 } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
@@ -124,22 +129,45 @@ export const TeamManagementModule = () => {
     loadCatalogs();
   }, [loadCatalogs]);
 
-  useEffect(
-    () =>
-      setAssignments(
-        Object.fromEntries(
-          users
-            .filter((user) => user.role?.code && EMPLOYEE_ROLES.has(user.role.code))
-            .map((user) => [user.id, { roleCode: user.role.code, storeId: user.store_id || '' }])
-        )
-      ),
-    [users]
-  );
+  useEffect(() => {
+    const map = {};
+    users
+      .filter((user) => user.role?.code && EMPLOYEE_ROLES.has(user.role.code))
+      .forEach((user) => {
+        map[user.id] = {
+          fullName: user.full_name || '',
+          email: user.email || '',
+          phoneNumber: user.phone_number || '',
+          roleCode: user.role.code,
+          storeId: user.store_id || '',
+        };
+      });
+    (overview?.employees || []).forEach((emp) => {
+      if (!map[emp.employee_id]) {
+        map[emp.employee_id] = {
+          fullName: emp.full_name || '',
+          email: emp.email || '',
+          phoneNumber: emp.phone_number || '',
+          roleCode: emp.role_code,
+          storeId: emp.store_id || '',
+        };
+      }
+    });
+    setAssignments((prev) => {
+      const merged = { ...map };
+      for (const [key, val] of Object.entries(prev)) {
+        if (merged[key]) {
+          merged[key] = { ...merged[key], ...val };
+        }
+      }
+      return merged;
+    });
+  }, [users, overview?.employees]);
 
   const employees = useMemo(
     () =>
       (overview?.employees || []).filter((employee) => {
-        const text = `${employee.full_name} ${employee.email}`.toLowerCase();
+        const text = `${employee.full_name} ${employee.email} ${employee.phone_number || ''}`.toLowerCase();
         return (
           text.includes(filters.search.toLowerCase()) &&
           (filters.role === 'all' || employee.role_code === filters.role) &&
@@ -194,16 +222,37 @@ export const TeamManagementModule = () => {
     });
   };
 
-  const saveAssignment = (employee) => {
-    const assignment = assignments[employee.employee_id];
-    if (!assignment?.storeId) return addToast('Select a store location before saving assignment', 'error');
-    requestConfirmation(`Update ${employee.full_name}'s role and store assignment`, async (reauthToken) => {
-      await api(`/users/${employee.employee_id}/role`, {
+  const saveEmployeeDetails = (employee) => {
+    const editData = assignments[employee.employee_id];
+    if (!editData?.fullName?.trim()) return addToast('Employee name is required', 'error');
+    if (!editData?.email?.trim()) return addToast('Employee email is required', 'error');
+    if (!editData?.storeId) return addToast('Select a store location before saving', 'error');
+    requestConfirmation(`Update ${editData.fullName.trim()}'s profile, phone number, and store permissions`, async (reauthToken) => {
+      await api(`/users/${employee.employee_id}`, {
         method: 'PATCH',
         headers: { 'X-Reauth-Token': reauthToken },
-        body: JSON.stringify({ role_code: assignment.roleCode, store_id: assignment.storeId }),
+        body: JSON.stringify({
+          full_name: editData.fullName.trim(),
+          email: editData.email.trim().toLowerCase(),
+          phone_number: editData.phoneNumber?.trim() || null,
+          role_code: editData.roleCode,
+          store_id: editData.storeId,
+        }),
       });
-      addToast('Employee role and store assignment updated successfully', 'success');
+      addToast('Employee details and permissions updated successfully', 'success');
+    });
+  };
+
+  const reissueToken = (employee) => {
+    requestConfirmation(`Generate fresh activation token for ${employee.full_name}`, async (reauthToken) => {
+      const result = await api(`/users/${employee.employee_id}/reissue-invitation`, {
+        method: 'POST',
+        headers: { 'X-Reauth-Token': reauthToken },
+      });
+      if (result.token) {
+        setInvitationToken(result.token);
+      }
+      addToast(result.message || 'Activation token generated successfully', 'success');
     });
   };
 
@@ -464,6 +513,7 @@ export const TeamManagementModule = () => {
                     isOwner={isOwner}
                     onSelect={() => setSelected(employee)}
                     onSetTarget={() => openTarget(employee)}
+                    onReissueToken={() => reissueToken(employee)}
                   />
                 ))}
               </tbody>
@@ -481,7 +531,7 @@ export const TeamManagementModule = () => {
       <Modal
         isOpen={Boolean(selected)}
         onClose={() => setSelected(null)}
-        title={selected ? `${selected.full_name} · Performance & Access Analysis` : ''}
+        title={selected ? `${selected.full_name} · Employee Profile & Performance Telemetry` : ''}
         maxWidth="max-w-4xl"
       >
         {selected && (
@@ -489,7 +539,8 @@ export const TeamManagementModule = () => {
             employee={selected}
             isOwner={isOwner}
             onSetTarget={() => openTarget(selected)}
-            onSaveAssignment={() => saveAssignment(selected)}
+            onSaveEmployee={() => saveEmployeeDetails(selected)}
+            onReissueToken={() => reissueToken(selected)}
             onToggle={() => toggleEmployee(selected)}
             roles={roles}
             stores={stores}
@@ -549,12 +600,18 @@ export const TeamManagementModule = () => {
       {/* Invite Employee Modal */}
       <Modal isOpen={isInviteOpen} onClose={() => setIsInviteOpen(false)} title="Invite Employee to Business">
         <form onSubmit={submitInvite} className="space-y-4">
-          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200">
-            An invitation link will be sent to the employee's work email address to set up their password.
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3.5 text-xs text-indigo-900 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200 space-y-1">
+            <p className="font-bold flex items-center gap-1.5">
+              <KeyRound className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              Employee Onboarding &amp; Security
+            </p>
+            <p className="text-slate-600 dark:text-slate-300">
+              An activation invitation token will be generated. Share this token with the employee so they can create their account password and access the workspace.
+            </p>
           </div>
           <Input
             label="Full Name"
-            placeholder="Sharma Kirana Rep"
+            placeholder="e.g. Sharma Kirana Rep"
             value={invite.fullName}
             onChange={(e) => setInvite({ ...invite, fullName: e.target.value })}
             required
@@ -562,7 +619,7 @@ export const TeamManagementModule = () => {
           <Input
             label="Work Email"
             type="email"
-            placeholder="rep@sharmatraders.in"
+            placeholder="e.g. rep@sharmatraders.in"
             value={invite.email}
             onChange={(e) => setInvite({ ...invite, email: e.target.value })}
             required
@@ -570,7 +627,7 @@ export const TeamManagementModule = () => {
           <Input
             label="Confirm Work Email"
             type="email"
-            placeholder="rep@sharmatraders.in"
+            placeholder="e.g. rep@sharmatraders.in"
             value={invite.confirmEmail}
             onChange={(e) => setInvite({ ...invite, confirmEmail: e.target.value })}
             required
@@ -593,7 +650,7 @@ export const TeamManagementModule = () => {
               Cancel
             </Button>
             <Button type="submit" icon={UserCheck}>
-              Send Invitation
+              Send Invitation &amp; Generate Token
             </Button>
           </div>
         </form>
@@ -627,26 +684,57 @@ export const TeamManagementModule = () => {
         </form>
       </Modal>
 
-      {/* Dev Token Modal */}
+      {/* Employee Invitation & Activation Token Modal */}
       <Modal
         isOpen={Boolean(invitationToken)}
         onClose={() => setInvitationToken('')}
-        title="Development Invitation Token"
+        title="Employee Account Activation Token"
       >
         <div className="space-y-4">
-          <p className="text-sm text-slate-500">Use this one-time token for local testing:</p>
-          <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 break-all font-mono text-xs text-indigo-600 dark:text-indigo-300">
-            {invitationToken}
+          <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/40 p-4 border border-indigo-200 dark:border-indigo-800 space-y-2">
+            <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 font-bold text-sm">
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <span>Invitation Token Ready</span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              Share this one-time activation token with your employee so they can activate their account and set their password.
+            </p>
           </div>
-          <div className="flex justify-end">
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              One-Time Activation Token
+            </label>
+            <div className="p-3.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 break-all font-mono text-xs text-indigo-600 dark:text-indigo-300 font-semibold select-all">
+              {invitationToken}
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-slate-50 dark:bg-slate-800/40 p-3.5 border border-slate-200 dark:border-slate-700/60 text-xs space-y-2">
+            <p className="font-bold text-slate-900 dark:text-slate-100">How the employee logs in:</p>
+            <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-300">
+              <li>Open the MarketMind Sign-In page.</li>
+              <li>Click <span className="font-semibold text-indigo-500">"Have an employee invitation token? Activate your account"</span>.</li>
+              <li>Paste this token and choose their account password.</li>
+              <li>Instantly sign in with their email and new password!</li>
+            </ol>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setInvitationToken('')}
+            >
+              Close
+            </Button>
             <Button
               icon={Copy}
               onClick={() => {
                 navigator.clipboard.writeText(invitationToken);
-                addToast('Invitation token copied to clipboard', 'success');
+                addToast('Activation token copied to clipboard!', 'success');
               }}
             >
-              Copy Token
+              Copy Activation Token
             </Button>
           </div>
         </div>
@@ -655,8 +743,9 @@ export const TeamManagementModule = () => {
   );
 };
 
-const EmployeeRow = ({ employee, isOwner, onSelect, onSetTarget }) => {
+const EmployeeRow = ({ employee, isOwner, onSelect, onSetTarget, onReissueToken }) => {
   const pitchScore = Math.min(98, 75 + ((employee.employee_id ? employee.employee_id.charCodeAt(0) : 7) % 23));
+  const isPending = employee.status === 'invited';
 
   return (
     <tr className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors">
@@ -668,8 +757,16 @@ const EmployeeRow = ({ employee, isOwner, onSelect, onSetTarget }) => {
           />
           <div className="min-w-0">
             <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{employee.full_name}</p>
-            <p className="text-[11px] text-slate-500 truncate">
-              {employee.role_name} · {employee.store_name || 'Main Store'}
+            <p className="text-[11px] text-slate-500 truncate flex items-center gap-1.5 flex-wrap">
+              <span>{employee.role_name}</span>
+              <span>·</span>
+              <span>{employee.store_name || 'Main Store'}</span>
+              {employee.phone_number && (
+                <>
+                  <span>·</span>
+                  <span className="text-indigo-500 dark:text-indigo-400 font-medium">{employee.phone_number}</span>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -717,12 +814,32 @@ const EmployeeRow = ({ employee, isOwner, onSelect, onSetTarget }) => {
         </div>
       </td>
       <td className="p-3">
-        <Badge variant={levelVariant[employee.performance_level]}>{levelLabel[employee.performance_level]}</Badge>
-        {employee.store_rank && <p className="text-[10px] text-slate-500 mt-0.5">Rank #{employee.store_rank}</p>}
+        {isPending ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant="warning">Pending Activation</Badge>
+            {isOwner && onReissueToken && (
+              <Button
+                size="xs"
+                variant="ghost"
+                icon={KeyRound}
+                onClick={onReissueToken}
+                title="Get or Reissue Activation Token"
+                className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 p-1"
+              >
+                Token
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div>
+            <Badge variant={levelVariant[employee.performance_level]}>{levelLabel[employee.performance_level]}</Badge>
+            {employee.store_rank && <p className="text-[10px] text-slate-500 mt-0.5">Rank #{employee.store_rank}</p>}
+          </div>
+        )}
       </td>
       <td className="p-3 text-right space-x-1">
-        <Button size="xs" variant="outline" onClick={onSelect}>
-          Analyse
+        <Button size="xs" variant="outline" icon={Edit} onClick={onSelect}>
+          Edit &amp; Analyse
         </Button>
         {isOwner && (
           <Button size="xs" variant="secondary" icon={Target} onClick={onSetTarget} title="Set Target">
@@ -783,7 +900,8 @@ const PerformanceDetail = ({
   employee,
   isOwner,
   onSetTarget,
-  onSaveAssignment,
+  onSaveEmployee,
+  onReissueToken,
   onToggle,
   roles,
   stores,
@@ -795,6 +913,7 @@ const PerformanceDetail = ({
   const [activityLogs, setActivityLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [logCategory, setLogCategory] = useState('all');
+  const isPending = employee.status === 'invited';
 
   useEffect(() => {
     if (!employee?.employee_id) return;
@@ -824,6 +943,8 @@ const PerformanceDetail = ({
     const csvContent =
       `EMPLOYEE PERFORMANCE & AI EVALUATION BRIEF\n` +
       `Employee,${employee.full_name}\n` +
+      `Email,${employee.email}\n` +
+      `Phone,${employee.phone_number || 'N/A'}\n` +
       `Role,${employee.role_name}\n` +
       `Total Revenue,INR ${employee.metrics.revenue}\n` +
       `Total Transactions,${employee.metrics.transactions}\n` +
@@ -846,6 +967,88 @@ const PerformanceDetail = ({
 
   return (
     <div className="space-y-5">
+      {/* Pending Activation Callout */}
+      {isPending && (
+        <div className="rounded-2xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4 text-xs text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div className="space-y-1">
+            <p className="font-bold flex items-center gap-1.5 text-sm text-amber-800 dark:text-amber-300">
+              <KeyRound className="w-4 h-4 text-amber-600" />
+              Account Pending Employee Activation
+            </p>
+            <p className="text-amber-700 dark:text-amber-300/80">
+              This employee account has been created. The employee must activate their account on the login page using their one-time invitation token.
+            </p>
+          </div>
+          {isOwner && onReissueToken && (
+            <Button
+              size="sm"
+              variant="outline"
+              icon={KeyRound}
+              onClick={onReissueToken}
+              className="bg-white dark:bg-slate-900 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 shrink-0 font-semibold"
+            >
+              Get / Reissue Token
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Editable Employee Profile Form for Business Owner */}
+      {isOwner && assignment && (
+        <Card hoverEffect={false} className="p-4.5 bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+              <UserCog className="w-4 h-4 text-indigo-500" />
+              <span>Edit Employee Profile &amp; Store Location Permissions</span>
+            </div>
+            <Badge variant="info" size="sm">Owner Access</Badge>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-3">
+            <Input
+              label="Full Name"
+              placeholder="e.g. Rahul Sharma"
+              value={assignment.fullName || ''}
+              onChange={(e) => setAssignment({ ...assignment, fullName: e.target.value })}
+              icon={UserCheck}
+              required
+            />
+            <Input
+              label="Work Email"
+              type="email"
+              placeholder="e.g. rahul@company.com"
+              value={assignment.email || ''}
+              onChange={(e) => setAssignment({ ...assignment, email: e.target.value })}
+              icon={Mail}
+              required
+            />
+            <Input
+              label="Contact Phone Number"
+              type="tel"
+              placeholder="e.g. +91 98765 43210"
+              value={assignment.phoneNumber || ''}
+              onChange={(e) => setAssignment({ ...assignment, phoneNumber: e.target.value })}
+              icon={Phone}
+            />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3 pt-1">
+            <Select
+              label="Assigned Role"
+              value={assignment.roleCode || employee.role_code}
+              onChange={(roleCode) => setAssignment({ ...assignment, roleCode })}
+              options={roles.map((r) => [r.code, r.name])}
+            />
+            <Select
+              label="Assigned Store Location"
+              value={assignment.storeId || employee.store_id || ''}
+              onChange={(storeId) => setAssignment({ ...assignment, storeId })}
+              options={stores.map((s) => [s.id, s.name])}
+            />
+          </div>
+        </Card>
+      )}
+
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Metric icon={IndianRupee} label="Total Revenue" value={money(employee.metrics.revenue)} />
         <Metric icon={BarChart3} label="Transactions" value={employee.metrics.transactions} />
@@ -899,30 +1102,6 @@ const PerformanceDetail = ({
             <span>{employee.target.remaining_days} days left</span>
           </div>
         </div>
-      )}
-
-      {/* Role & Store Editing Form for Owner */}
-      {isOwner && assignment && (
-        <Card hoverEffect={false} className="p-4 bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-            <UserCog className="w-4 h-4 text-indigo-500" />
-            <span>Edit Employee Role &amp; Store Location Assignment</span>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <Select
-              label="Assigned Role"
-              value={assignment.roleCode}
-              onChange={(roleCode) => setAssignment({ ...assignment, roleCode })}
-              options={roles.map((r) => [r.code, r.name])}
-            />
-            <Select
-              label="Assigned Store Location"
-              value={assignment.storeId}
-              onChange={(storeId) => setAssignment({ ...assignment, storeId })}
-              options={stores.map((s) => [s.id, s.name])}
-            />
-          </div>
-        </Card>
       )}
 
       {/* 60-Day Employee Task & Activity History */}
@@ -1070,8 +1249,8 @@ const PerformanceDetail = ({
         </Button>
         {isOwner && (
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={onSaveAssignment}>
-              Save Assignment
+            <Button variant="primary" size="sm" icon={Save} onClick={onSaveEmployee}>
+              Save Employee Details
             </Button>
             <Button variant="outline" size="sm" icon={Target} onClick={onSetTarget}>
               Set Target

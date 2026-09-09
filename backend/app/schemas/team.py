@@ -54,6 +54,7 @@ class EmployeePerformanceResponse(BaseModel):
     employee_id: UUID
     full_name: str
     email: str
+    phone_number: str | None = None
     role_code: str
     role_name: str
     store_id: UUID | None

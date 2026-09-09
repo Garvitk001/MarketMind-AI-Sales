@@ -111,3 +111,23 @@ class RoleChangeRequest(BaseModel):
 
 class AccountStateRequest(BaseModel):
     enabled: bool
+
+
+class EmployeeUpdateRequest(BaseModel):
+    full_name: str | None = Field(default=None, min_length=2, max_length=160)
+    email: EmailStr | None = None
+    phone_number: str | None = Field(default=None, max_length=24)
+    role_code: str | None = None
+    store_id: UUID | None = None
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_number(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        cleaned = value.strip()
+        if not all(character.isdigit() or character in "+- ()" for character in cleaned):
+            raise ValueError("Phone number contains unsupported characters")
+        if sum(character.isdigit() for character in cleaned) < 7:
+            raise ValueError("Phone number must contain at least 7 digits")
+        return cleaned

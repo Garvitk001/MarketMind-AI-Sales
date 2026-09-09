@@ -21,6 +21,7 @@ from app.schemas.common import MessageResponse
 from app.schemas.users import (
     AccountStateRequest,
     BusinessProfileUpdate,
+    EmployeeUpdateRequest,
     InvitationAcceptRequest,
     ProfileUpdate,
     RoleChangeRequest,
@@ -375,11 +376,11 @@ def invite_user(
     db.commit()
     return DevelopmentTokenResponse(
         message=(
-            "Invitation emailed. The account remains pending until the employee activates it."
+            "Invitation emailed. The account remains pending until the employee activates it. You can also share the activation token directly."
             if email_sent
-            else "Invitation created successfully."
+            else "Invitation created successfully. The account remains pending until the employee activates it with the token."
         ),
-        token=token if settings.expose_development_tokens and not settings.is_production else None,
+        token=token,
     )
 
 
@@ -403,6 +404,119 @@ def accept_invitation(payload: InvitationAcceptRequest, request: Request, db: DB
     )
     db.commit()
     return MessageResponse(message="Invitation accepted")
+
+
+@router.patch(
+    "/{user_id}",
+    response_model=UserResponse,
+    dependencies=[Depends(require_reauthentication)],
+)
+def update_employee(
+    user_id: UUID,
+    payload: EmployeeUpdateRequest,
+    request: Request,
+    db: DBSession,
+    actor: User = Depends(require_permissions(Permissions.USERS_MANAGE)),
+):
+    require_business_owner(actor)
+    target = db.get(User, user_id)
+    if not target or target.tenant_id != actor.tenant_id:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.role.code not in OWNER_ASSIGNABLE_ROLES:
+        raise HTTPException(status_code=403, detail="Only employee accounts can be edited")
+
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=422, detail="At least one field must be provided to update")
+
+    if "full_name" in changes and changes["full_name"]:
+        target.full_name = changes["full_name"].strip()
+
+    if "email" in changes and changes["email"]:
+        new_email = normalize_email(changes["email"])
+        if new_email != target.email:
+            existing = find_user_by_email(db, new_email)
+            if existing and existing.id != target.id:
+                raise HTTPException(status_code=409, detail="An account with this email already exists")
+            target.email = new_email
+
+    if "phone_number" in changes:
+        target.phone_number = changes["phone_number"].strip() if changes["phone_number"] else None
+
+    if "role_code" in changes and changes["role_code"]:
+        validate_employee_role(changes["role_code"])
+        role = get_role(db, changes["role_code"])
+        if not role:
+            raise HTTPException(status_code=422, detail="Unknown role")
+        target.role_id = role.id
+        revoke_user_sessions(db, target.id, "role_changed")
+
+    if "store_id" in changes and changes["store_id"]:
+        if not validate_store_scope(db, actor.tenant_id, changes["store_id"]):
+            raise HTTPException(status_code=422, detail="Store does not belong to this tenant")
+        target.store_id = changes["store_id"]
+
+    audit_changes = {k: str(v) if isinstance(v, UUID) else v for k, v in changes.items()}
+    record_audit(
+        db,
+        event_type="owner.employee_updated",
+        request=request,
+        tenant_id=actor.tenant_id,
+        actor_user_id=actor.id,
+        target_type="user",
+        target_id=str(target.id),
+        details={"changes": audit_changes},
+    )
+    db.commit()
+    db.refresh(target)
+    return serialize_user(target)
+
+
+@router.post(
+    "/{user_id}/reissue-invitation",
+    response_model=DevelopmentTokenResponse,
+    dependencies=[Depends(require_reauthentication)],
+)
+def reissue_employee_invitation(
+    user_id: UUID,
+    request: Request,
+    db: DBSession,
+    actor: User = Depends(require_permissions(Permissions.USERS_MANAGE)),
+):
+    require_business_owner(actor)
+    target = db.get(User, user_id)
+    if not target or target.tenant_id != actor.tenant_id:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.role.code not in OWNER_ASSIGNABLE_ROLES:
+        raise HTTPException(status_code=403, detail="Only employee accounts can be reissued invitations")
+
+    token = issue_security_token(db, user=target, purpose=SecurityTokenPurpose.INVITATION)
+    email_sent = False
+    try:
+        email_sent = send_invitation_email(
+            recipient=target.email, full_name=target.full_name, token=token
+        )
+    except Exception:
+        email_sent = False
+
+    record_audit(
+        db,
+        event_type="owner.employee_invitation_reissued",
+        request=request,
+        tenant_id=actor.tenant_id,
+        actor_user_id=actor.id,
+        target_type="user",
+        target_id=str(target.id),
+    )
+    db.commit()
+    return DevelopmentTokenResponse(
+        message=(
+            f"Invitation token generated and emailed to {target.email}."
+            if email_sent
+            else f"Invitation token generated for {target.full_name}. Share this token with the employee to complete activation."
+        ),
+        token=token,
+    )
 
 
 @router.patch(
