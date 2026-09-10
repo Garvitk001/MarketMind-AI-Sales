@@ -109,6 +109,7 @@ export const SalesModule = () => {
     const matchesSearch = `${deal.displayReference} ${custName} ${deal.source_system || ''}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
+    const matchesPayment = paymentFilter === 'all' || deal.payment_status === paymentFilter;
     const matchesMethod = methodFilter === 'all' || (() => {
       const method = String(deal.payment_method || '').toLowerCase().trim();
       if (methodFilter === 'upi') return method.includes('upi') || method.includes('qr');
