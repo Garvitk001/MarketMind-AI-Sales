@@ -189,7 +189,14 @@ def list_customer_segments(
         if segment_code:
             query = query.where(CustomerSegmentAssignment.segment_code == segment_code.strip())
         if search:
-            query = query.where(Customer.external_customer_id.ilike(f"%{search.strip()}%"))
+            search_pattern = f"%{search.strip()}%"
+            query = query.where(
+                (Customer.external_customer_id.ilike(search_pattern))
+                | (Customer.company_name.ilike(search_pattern))
+                | (Customer.contact_email.ilike(search_pattern))
+                | (Customer.contact_phone.ilike(search_pattern))
+                | (Customer.gstin.ilike(search_pattern))
+            )
         total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
         rows = db.execute(
             query.order_by(
@@ -212,9 +219,13 @@ def list_customer_segments(
     if Permissions.DASHBOARD_SEGMENTS_ASSIGNED in user.permission_codes:
         cust_query = cust_query.where(Customer.assigned_seller_id == user.id)
     if search:
+        search_pattern = f"%{search.strip()}%"
         cust_query = cust_query.where(
-            (Customer.external_customer_id.ilike(f"%{search.strip()}%"))
-            | (Customer.company_name.ilike(f"%{search.strip()}%"))
+            (Customer.external_customer_id.ilike(search_pattern))
+            | (Customer.company_name.ilike(search_pattern))
+            | (Customer.contact_email.ilike(search_pattern))
+            | (Customer.contact_phone.ilike(search_pattern))
+            | (Customer.gstin.ilike(search_pattern))
         )
     all_custs = db.scalars(cust_query).all()
     all_items = [_heuristic_segment_customer(c) for c in all_custs]

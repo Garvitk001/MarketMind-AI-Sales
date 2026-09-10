@@ -167,8 +167,131 @@ export const DataProvider = ({ children }) => {
     await refresh(nextRange);
   };
 
+  const [purchaseOrders, setPurchaseOrders] = useState(() => {
+    try {
+      const stored = localStorage.getItem('marketmind_purchase_orders');
+      if (stored) return JSON.parse(stored);
+    } catch {
+      // fallback
+    }
+    return [
+      {
+        id: 'PO-2026-1082',
+        item_id: 'PRD-001',
+        item_name: 'Smart POS Terminal Android',
+        item_sku: 'POS-AND-99',
+        category: 'POS & Hardware',
+        quantity: 35,
+        original_quantity: 35,
+        unit_price: 6499,
+        supplier_name: 'Rajdhani Tech & Hardware Logistics',
+        total_amount: 227465,
+        status: 'pending_owner_approval',
+        store_name: 'Downtown Main Flagship Store',
+        created_by_name: 'Rohan Sharma (Store Manager)',
+        created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+        notes: 'Urgent restocking needed for weekend rush.',
+        owner_remarks: '',
+      },
+      {
+        id: 'PO-2026-1079',
+        item_id: 'PRD-004',
+        item_name: 'Thermal Receipt Rolls (Box of 50)',
+        item_sku: 'ACC-THM-50',
+        category: 'Accessories',
+        quantity: 100,
+        original_quantity: 120,
+        unit_price: 850,
+        supplier_name: 'Apex Wholesaler & FMCG Distributors',
+        total_amount: 85000,
+        status: 'approved',
+        store_name: 'Downtown Main Flagship Store',
+        created_by_name: 'Rohan Sharma (Store Manager)',
+        created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+        approved_at: new Date(Date.now() - 86400000 * 1).toISOString(),
+        notes: 'Monthly billing roll replenishment.',
+        owner_remarks: 'Approved with adjusted 100 boxes quota.',
+      }
+    ];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('marketmind_purchase_orders', JSON.stringify(purchaseOrders));
+    } catch (err) {
+      console.error('Failed to sync POs to localStorage', err);
+    }
+  }, [purchaseOrders]);
+
+  const createPurchaseOrder = (newPo) => {
+    const poEntry = {
+      id: `PO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      status: 'pending_owner_approval',
+      created_at: new Date().toISOString(),
+      original_quantity: Number(newPo.quantity || 1),
+      total_amount: Number(newPo.quantity || 1) * Number(newPo.unit_price || 0),
+      owner_remarks: '',
+      ...newPo,
+    };
+    setPurchaseOrders((prev) => [poEntry, ...prev]);
+    return poEntry;
+  };
+
+  const updatePurchaseOrderStatus = (poId, status, remarks = '') => {
+    setPurchaseOrders((prev) =>
+      prev.map((po) => {
+        if (po.id === poId) {
+          return {
+            ...po,
+            status,
+            owner_remarks: remarks || po.owner_remarks,
+            approved_at: status === 'approved' ? new Date().toISOString() : po.approved_at,
+            rejected_at: status === 'rejected' ? new Date().toISOString() : po.rejected_at,
+          };
+        }
+        return po;
+      })
+    );
+  };
+
+  const editAndApprovePurchaseOrder = (poId, updatedFields) => {
+    setPurchaseOrders((prev) =>
+      prev.map((po) => {
+        if (po.id === poId) {
+          const qty = Number(updatedFields.quantity ?? po.quantity);
+          const price = Number(updatedFields.unit_price ?? po.unit_price);
+          return {
+            ...po,
+            ...updatedFields,
+            quantity: qty,
+            unit_price: price,
+            total_amount: qty * price,
+            status: 'approved',
+            approved_at: new Date().toISOString(),
+            owner_remarks: updatedFields.owner_remarks || 'Edited and approved by Business Owner',
+          };
+        }
+        return po;
+      })
+    );
+  };
+
+  const deletePurchaseOrder = (poId) => {
+    setPurchaseOrders((prev) => prev.filter((po) => po.id !== poId));
+  };
+
   return (
-    <DataContext.Provider value={{ ...data, refresh, salesDateRange, applySalesDateRange }}>
+    <DataContext.Provider value={{
+      ...data,
+      refresh,
+      salesDateRange,
+      applySalesDateRange,
+      purchaseOrders,
+      createPurchaseOrder,
+      updatePurchaseOrderStatus,
+      editAndApprovePurchaseOrder,
+      deletePurchaseOrder,
+    }}>
       {children}
     </DataContext.Provider>
   );
@@ -179,3 +302,4 @@ export const useData = () => {
   if (!context) throw new Error('useData must be used within a DataProvider');
   return context;
 };
+

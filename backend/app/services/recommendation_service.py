@@ -228,32 +228,51 @@ def get_product_recommendations(
     include_eval: bool = True
 ) -> RecommendationResponse:
     logger.info(f"Generating recommendations (tenant={tenant_id}, role={role}, customer_id={customer_id}, sku={sku}, category={category}, strategy={strategy})")
-
     cust_query = db.query(Customer)
     prod_query = db.query(Product)
     if tenant_id:
         cust_query = cust_query.filter(Customer.tenant_id == tenant_id)
         prod_query = prod_query.filter(Product.tenant_id == tenant_id)
 
-    customer = cust_query.filter(Customer.external_customer_id == customer_id).first() if customer_id else None
+    customer = None
+    if customer_id:
+        try:
+            val_uuid = UUID(str(customer_id).strip())
+            customer = cust_query.filter(Customer.id == val_uuid).first()
+        except (ValueError, AttributeError):
+            pass
+        if not customer:
+            customer = cust_query.filter(Customer.external_customer_id == str(customer_id).strip()).first()
+
     base_product = prod_query.filter(Product.sku == sku).first() if sku else None
     base_category = category or (base_product.category if base_product else None)
 
     query = prod_query
     if sku:
         query = query.filter(Product.sku != sku)
-    if category and category != "All Categories":
+    if category and category != "All Categories" and category != "all":
         query = query.filter(Product.category == category)
 
     candidate_products = query.all()
 
     if not candidate_products:
         logger.warning("No candidate products found matching filter criteria")
-        customer_info = RecommendationCustomerInfo(
-            id=customer.id, name=customer.name, tier=customer.tier
-        ) if customer else None
+        customer_info = None
+        if customer:
+            cust_name = (
+                getattr(customer, 'company_name', None)
+                or getattr(customer, 'contact_name', None)
+                or getattr(customer, 'name', None)
+                or getattr(customer, 'external_customer_id', None)
+                or 'Customer'
+            )
+            customer_info = RecommendationCustomerInfo(
+                id=str(customer.id),
+                name=str(cust_name),
+                tier=str(getattr(customer, 'tier', None) or 'Silver Tier')
+            )
 
-        eval_metrics = calculate_evaluation_metrics(db, k=limit) if include_eval else None
+        eval_metrics = calculate_evaluation_metrics(db, k=min(limit, 5)) if include_eval else None
 
         return RecommendationResponse(
             total=0,
@@ -264,8 +283,7 @@ def get_product_recommendations(
             evaluation=eval_metrics
         )
 
-    scored_items: List[Tuple[float, RecommendationItem]] = []
-
+    scored_items = []
     for prod in candidate_products:
         prod_stock = getattr(prod, 'stock', 50)
         prod_sales_count = getattr(prod, 'sales_count', 100)
@@ -288,19 +306,19 @@ def get_product_recommendations(
         )
         match_score = int(round(min(99, max(50, raw_score * 100))))
 
-        if strategy == "cross_sell" and s_affinity < 0.6:
+        if strategy == "cross_sell" and s_affinity < 0.5:
             continue
-        elif strategy == "upsell" and prod_unit_price < 100.0:
+        elif strategy == "upsell" and prod_unit_price < 80.0:
             continue
-        elif strategy == "high_margin" and prod_unit_price < 150.0:
+        elif strategy == "high_margin" and prod_unit_price < 120.0:
             continue
-        elif strategy == "inventory_clearance" and prod_stock < 20:
+        elif strategy == "inventory_clearance" and prod_stock < 10:
             continue
 
         rec_type = determine_recommendation_type(strategy, s_affinity, prod_unit_price, prod_stock, customer)
         reason = generate_ai_reasoning(prod, match_score, rec_type, customer, base_product, role)
 
-        batch_multiplier = 10 if prod.category == "Supplies" else 2
+        batch_multiplier = 10 if (prod.category or '').lower() in ["supplies", "fmcg"] else 2
         potential_revenue_val = prod_unit_price * batch_multiplier
         potential_revenue_str = f"₹{potential_revenue_val:,.2f}"
 
@@ -311,7 +329,7 @@ def get_product_recommendations(
             category=prod.category or "General",
             unit_price=prod_unit_price,
             stock=prod_stock,
-            supplier=getattr(prod, "supplier", "NextGen POS") or "NextGen POS",
+            supplier=getattr(prod, "supplier", "Apex Wholesale") or "Apex Wholesale",
             match_score=match_score,
             recommendation_type=rec_type,
             reasoning=reason,
@@ -325,11 +343,20 @@ def get_product_recommendations(
     scored_items.sort(key=lambda x: x[0], reverse=True)
     final_items = [item for _, item in scored_items[:limit]]
 
-    customer_info = RecommendationCustomerInfo(
-        id=str(customer.id),
-        name=getattr(customer, 'name', getattr(customer, 'external_customer_id', 'Customer')),
-        tier=getattr(customer, 'tier', 'Silver Tier')
-    ) if customer else None
+    customer_info = None
+    if customer:
+        cust_name = (
+            getattr(customer, 'company_name', None)
+            or getattr(customer, 'contact_name', None)
+            or getattr(customer, 'name', None)
+            or getattr(customer, 'external_customer_id', None)
+            or 'Customer'
+        )
+        customer_info = RecommendationCustomerInfo(
+            id=str(customer.id),
+            name=str(cust_name),
+            tier=str(getattr(customer, 'tier', None) or 'Silver Tier')
+        )
 
     eval_metrics = calculate_evaluation_metrics(db, k=min(limit, 5)) if include_eval else None
 

@@ -177,17 +177,9 @@ export const SettingsModule = ({ onNavigate }) => {
       });
       await refreshProfile?.();
       setSavedBizAt(new Date());
-      addToast({
-        type: 'success',
-        title: 'Business Profile Updated',
-        message: 'Business name and details updated successfully across MarketMind.'
-      });
+      addToast('Business name and details updated successfully across MarketMind.', 'success');
     } catch (error) {
-      addToast({
-        type: 'error',
-        title: 'Failed to Update Business Profile',
-        message: error.message || 'Error updating business settings.'
-      });
+      addToast(error.message || 'Error updating business settings.', 'error');
     } finally {
       setSavingBiz(false);
     }

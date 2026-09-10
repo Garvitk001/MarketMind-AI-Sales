@@ -86,7 +86,7 @@ const getRecommendedReorderQty = (item) => {
 export const ManagerDashboard = () => {
   const { profile, api } = useAuth();
   const { addToast } = useToast();
-  const { inventorySummary, inventoryItems: liveInventoryItems, refresh } = useData();
+  const { inventorySummary, inventoryItems: liveInventoryItems, refresh, purchaseOrders = [], createPurchaseOrder, deletePurchaseOrder } = useData();
 
   const [stores, setStores] = useState([]);
   const [storeFilter, setStoreFilter] = useState('all');
@@ -96,10 +96,12 @@ export const ManagerDashboard = () => {
   const [selectedPoItem, setSelectedPoItem] = useState(null);
   const [poQuantity, setPoQuantity] = useState('50');
   const [poSupplier, setPoSupplier] = useState('Apex Wholesaler & FMCG Distributors');
+  const [poNotes, setPoNotes] = useState('');
   const [inventoryView, setInventoryView] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [expiryFilter, setExpiryFilter] = useState('all');
   const [searchFilter, setSearchFilter] = useState('');
+
 
   // Stock Movement / Adjustment Modal State
   const [adjustmentItem, setAdjustmentItem] = useState(null);
@@ -228,7 +230,7 @@ export const ManagerDashboard = () => {
         supplier: 'Apex Wholesaler & FMCG Distributors'
       };
     });
-  }, [liveInventoryItems]);
+  }, [activeItemsList, scopedItems, liveInventoryItems]);
 
   // Aggregate Commercial Telemetry KPIs
   const stockKpis = useMemo(() => {
@@ -391,52 +393,60 @@ export const ManagerDashboard = () => {
     addToast('Valued Stock Register CSV exported successfully!', 'success');
   };
 
-  const handleDownloadPoCsv = () => {
+  const handleSubmitPoForApproval = (e) => {
+    e?.preventDefault();
     if (!selectedPoItem) return;
-    const qty = Number(poQuantity) || 50;
-    const totalVal = qty * (selectedPoItem.unitPriceNum || 199);
+    const qty = Number(poQuantity) || 1;
+    const price = Number(selectedPoItem.unitPriceNum || selectedPoItem.price || 199);
+    const storeObj = stores.find((s) => s.id === storeFilter);
+    const currentStoreName = storeObj?.name || profile?.store_name || 'Downtown Main Flagship Store';
+
+    const newPo = createPurchaseOrder({
+      item_id: selectedPoItem.rawId || selectedPoItem.id,
+      item_name: selectedPoItem.name,
+      item_sku: selectedPoItem.id,
+      category: selectedPoItem.category || 'General',
+      quantity: qty,
+      unit_price: price,
+      supplier_name: poSupplier,
+      store_name: currentStoreName,
+      created_by_name: profile?.full_name ? `${profile.full_name} (Store Manager)` : 'Store Operations Manager',
+      notes: poNotes || 'Stock replenishment request submitted to Business Owner for review and approval.',
+    });
+
+    addToast(`Purchase Order ${newPo.id} submitted for Business Owner approval!`, 'success');
+    setSelectedPoItem(null);
+    setPoNotes('');
+  };
+
+  const handleDispatchPoEmail = (po) => {
+    if (!po) return;
+    const supplierSlug = (po.supplier_name || 'supplier').toLowerCase().replace(/[^a-z0-9]/g, '');
+    addToast(`Purchase Order ${po.id} dispatched via Email to ${po.supplier_name} (orders@${supplierSlug || 'supplier'}.com)`, 'success');
+  };
+
+  const downloadPoFile = (po) => {
+    if (!po) return;
     const csvContent =
-      `PURCHASE ORDER,PO-2026-${Math.floor(1000 + Math.random() * 9000)}\n` +
-      `Date,${new Date().toISOString().slice(0, 10)}\n` +
-      `Supplier,${poSupplier}\n` +
-      `SKU,Product Name,Quantity,Unit Price (INR),Total Value (INR)\n` +
-      `"${selectedPoItem.id}","${selectedPoItem.name}",${qty},${selectedPoItem.unitPriceNum || 199},${totalVal}\n`;
+      `PURCHASE ORDER,${po.id}\n` +
+      `Date,${(po.created_at || new Date().toISOString()).slice(0, 10)}\n` +
+      `Supplier,${po.supplier_name}\n` +
+      `Store,${po.store_name}\n` +
+      `Status,${po.status.toUpperCase()}\n` +
+      `SKU,Product Name,Category,Quantity,Unit Price (INR),Total Value (INR)\n` +
+      `"${po.item_sku}","${po.item_name}","${po.category}",${po.quantity},${po.unit_price},${po.total_amount}\n` +
+      (po.owner_remarks ? `Owner Remarks,"${po.owner_remarks}"\n` : '');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `PurchaseOrder_${selectedPoItem.id}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `PurchaseOrder_${po.id}_${po.item_sku}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-
-    addToast(`Purchase Order CSV generated for ${selectedPoItem.id}!`, 'success');
-    setSelectedPoItem(null);
+    addToast(`Downloaded Purchase Order ${po.id}`, 'info');
   };
 
-  const handleEmailPoSupplier = () => {
-    if (!selectedPoItem) return;
-    const qty = Number(poQuantity) || 50;
-    const totalVal = qty * (selectedPoItem.unitPriceNum || 199);
-    const subject = `Purchase Order Request: ${selectedPoItem.name} (${selectedPoItem.id})`;
-    const body =
-      `Dear ${poSupplier} Sales Team,\n\n` +
-      `Please issue a Purchase Order for the following restocking order:\n\n` +
-      `Product SKU: ${selectedPoItem.id}\n` +
-      `Product Name: ${selectedPoItem.name}\n` +
-      `Requested Reorder Quantity: ${qty} units\n` +
-      `Estimated Order Value: ₹${totalVal.toLocaleString('en-IN')}\n\n` +
-      `Please confirm receipt and expected delivery schedule.\n\n` +
-      `Regards,\n` +
-      `Store Operations Manager\n` +
-      `MarketMind AI Workspace`;
-
-    window.location.href = `mailto:orders@${poSupplier.toLowerCase().replace(/[^a-z0-9]/g, '')}.com?subject=${encodeURIComponent(
-      subject
-    )}&body=${encodeURIComponent(body)}`;
-    addToast(`Opened supplier email dispatch for ${selectedPoItem.id}`, 'info');
-    setSelectedPoItem(null);
-  };
 
   const handleCreateProduct = async (e) => {
     e.preventDefault();
@@ -921,11 +931,25 @@ export const ManagerDashboard = () => {
               <Button
                 variant="outline"
                 size="sm"
+                icon={RefreshCw}
                 onClick={async () => {
+                  if (storeFilter !== 'all') {
+                    const params = new URLSearchParams({ store_id: storeFilter, limit: '200' });
+                    try {
+                      const [invRes, sumRes] = await Promise.all([
+                        api(`/inventory?${params}`),
+                        api(`/inventory/summary?store_id=${storeFilter}`),
+                      ]);
+                      setScopedItems(invRes.items || []);
+                      setScopedSummary(sumRes || null);
+                    } catch {
+                      setScopedItems([]);
+                      setScopedSummary(null);
+                    }
+                  }
                   await refresh();
                   addToast('Stock database refreshed', 'info');
                 }}
-                icon={RefreshCw}
               >
                 Refresh
               </Button>
@@ -949,83 +973,69 @@ export const ManagerDashboard = () => {
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {filteredItems.map((item) => {
-                const stockPercent = Math.min(100, Math.round((item.stock / Math.max(1, item.minStock * 3)) * 100));
-
+                const stockStatus = item.rawStatus;
                 return (
-                  <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <tr
+                    key={item.id}
+                    className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
+                  >
                     <td className="p-3">
-                      <p className="font-mono font-bold text-slate-900 dark:text-slate-100">{item.id}</p>
-                      <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">HSN: {item.hsnCode}</p>
+                      <div className="font-bold text-slate-900 dark:text-slate-100">{item.id}</div>
+                      <div className="text-[11px] text-slate-400">HSN: {item.hsnCode}</div>
                     </td>
-
                     <td className="p-3">
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">{item.name}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {item.category} · <span className="font-semibold text-indigo-600 dark:text-indigo-400">{item.packSize}</span>
-                      </p>
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">{item.name}</div>
+                      <div className="text-[11px] text-slate-400">{item.category} • {item.packSize}</div>
                     </td>
-
                     <td className="p-3">
-                      <p className="font-mono text-slate-700 dark:text-slate-300 font-semibold">{item.batchNumber}</p>
-                      <span
-                        className={`inline-block text-[10px] font-mono px-2 py-0.5 rounded border ${
-                          item.isExpiringSoon
-                            ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-400/30 font-bold'
-                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-400/20'
-                        }`}
-                      >
-                        Exp: {item.expiryDate} {item.isExpiringSoon && '(Near Expiry)'}
-                      </span>
-                    </td>
-
-                    <td className="p-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 dark:text-slate-100">{item.stock} Units</span>
-                          <span className="text-[10px] text-slate-400">(Min: {item.minStock})</span>
-                        </div>
-                        <div className="w-28 bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              item.stock <= item.minStock
-                                ? 'bg-rose-500'
-                                : item.stock <= item.minStock * 2
-                                ? 'bg-amber-500'
-                                : 'bg-emerald-500'
-                            }`}
-                            style={{ width: `${stockPercent}%` }}
-                          />
-                        </div>
+                      <div className="text-slate-700 dark:text-slate-300 font-medium">{item.batchNumber}</div>
+                      <div className={`text-[11px] ${item.daysToExpiry <= 90 ? 'text-amber-500 font-bold' : 'text-slate-400'}`}>
+                        Exp: {item.expiryDate} ({item.daysToExpiry}d)
                       </div>
                     </td>
-
                     <td className="p-3">
-                      <p className="font-bold text-slate-900 dark:text-slate-100">{item.unitPrice}</p>
-                      <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Val: {item.totalValueFormatted}</p>
+                      <div className="font-bold text-slate-900 dark:text-slate-100">{item.stock} Units</div>
+                      <div className="text-[11px] text-slate-400">Reorder Min: {item.minStock}</div>
                     </td>
-
+                    <td className="p-3">
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">₹{item.unitPriceNum.toLocaleString('en-IN')}</div>
+                      <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
+                        Val: ₹{item.totalValueNum.toLocaleString('en-IN')}
+                      </div>
+                    </td>
                     <td className="p-3">
                       <Badge
                         variant={
-                          item.rawStatus === 'out_of_stock'
-                            ? 'danger'
-                            : item.rawStatus === 'low_stock'
+                          stockStatus === 'in_stock'
+                            ? 'success'
+                            : stockStatus === 'low_stock'
                             ? 'warning'
-                            : 'success'
+                            : 'danger'
                         }
                       >
-                        {item.status}
+                        {stockStatus === 'in_stock' ? 'In Stock' : stockStatus === 'low_stock' ? 'Low Stock' : 'Out of Stock'}
                       </Badge>
                     </td>
-
                     <td className="p-3 text-right">
-                      <div className="flex justify-end items-center gap-1.5">
+                      <div className="flex items-center justify-end gap-1.5">
                         <Button
                           variant="ghost"
                           size="sm"
                           icon={Edit2}
-                          onClick={() => handleOpenEditModal(item)}
-                          className="text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 px-2"
+                          onClick={() => {
+                            setEditProductItem(item);
+                            setEditProductForm({
+                              name: item.name,
+                              sku: item.id,
+                              category: item.category,
+                              unit_price: String(item.unitPriceNum),
+                              stock_quantity: String(item.stock),
+                              reorder_level: String(item.minStock),
+                              batch_number: item.batchNumber,
+                              expiry_date: item.expiryDate || '',
+                            });
+                          }}
+                          className="text-xs"
                           title="Edit Product Details"
                         >
                           Edit
@@ -1033,20 +1043,10 @@ export const ManagerDashboard = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          icon={Trash2}
-                          onClick={() => setDeleteProductItem(item)}
-                          className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 px-2"
-                          title="Delete Product"
-                        >
-                          Delete
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          icon={Layers}
+                          icon={Boxes}
                           onClick={() => handleOpenAdjustmentModal(item)}
                           className="text-xs"
-                          title="Record Stock Movement"
+                          title="Adjust or Receive Stock"
                         >
                           Adjust
                         </Button>
@@ -1069,6 +1069,181 @@ export const ManagerDashboard = () => {
                 <tr>
                   <td colSpan="7" className="p-8 text-center text-xs text-slate-400">
                     No stock inventory items match the selected filters or search query.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Purchase Order (PO) Tracking & Approvals Card */}
+      <Card hoverEffect={false} className="border-indigo-100 dark:border-indigo-900/40">
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40">
+                <Truck className="w-5 h-5" />
+              </div>
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <span>Store Purchase Order (PO) Tracking</span>
+                  <Badge variant="info">2-Step Approval</Badge>
+                </CardTitle>
+                <CardDescription>
+                  Procurement requests submitted to the Business Owner for review, budget authorization, and dispatch
+                </CardDescription>
+              </div>
+            </div>
+
+            <Button
+              variant="primary"
+              size="sm"
+              icon={PlusCircle}
+              onClick={() => handleOpenPoModal(null)}
+              className="text-xs font-semibold"
+            >
+              Raise New PO
+            </Button>
+          </div>
+        </CardHeader>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="uppercase text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+              <tr>
+                <th className="p-3">PO Number &amp; Date</th>
+                <th className="p-3">Product / SKU</th>
+                <th className="p-3">Quantity &amp; Unit Rate</th>
+                <th className="p-3">Wholesale Supplier</th>
+                <th className="p-3">Total Estimated Amount</th>
+                <th className="p-3">Approval Status</th>
+                <th className="p-3">Owner Remarks / Notes</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+              {purchaseOrders.map((po) => (
+                <tr key={po.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                  <td className="p-3">
+                    <div className="font-bold text-slate-900 dark:text-slate-100">{po.id}</div>
+                    <div className="text-[11px] text-slate-400">
+                      {new Date(po.created_at || Date.now()).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <div className="font-semibold text-slate-900 dark:text-slate-100">{po.item_name}</div>
+                    <div className="text-[11px] text-slate-400">{po.item_sku} • {po.category}</div>
+                  </td>
+                  <td className="p-3">
+                    <div className="font-bold text-slate-900 dark:text-slate-100">{po.quantity} Units</div>
+                    <div className="text-[11px] text-slate-400">Rate: ₹{Number(po.unit_price).toLocaleString('en-IN')}</div>
+                  </td>
+                  <td className="p-3">
+                    <div className="font-medium text-slate-800 dark:text-slate-200">{po.supplier_name}</div>
+                    <div className="text-[11px] text-slate-400">{po.store_name}</div>
+                  </td>
+                  <td className="p-3">
+                    <div className="font-bold text-indigo-600 dark:text-indigo-400">
+                      ₹{Number(po.total_amount).toLocaleString('en-IN')}
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    {po.status === 'pending_owner_approval' && (
+                      <Badge variant="warning" className="inline-flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        <span>Pending Owner Approval</span>
+                      </Badge>
+                    )}
+                    {po.status === 'approved' && (
+                      <Badge variant="success" className="inline-flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Approved &amp; Dispatched</span>
+                      </Badge>
+                    )}
+                    {po.status === 'rejected' && (
+                      <Badge variant="danger" className="inline-flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span>Rejected by Owner</span>
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="p-3 max-w-xs">
+                    {po.owner_remarks ? (
+                      <div className="text-xs text-slate-700 dark:text-slate-300 font-medium italic">
+                        "{po.owner_remarks}"
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-400">{po.notes || '—'}</div>
+                    )}
+                  </td>
+                  <td className="p-3 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Mail}
+                        onClick={() => handleDispatchPoEmail(po)}
+                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                        title="Dispatch PO via Email"
+                      >
+                        Email
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Download}
+                        onClick={() => downloadPoFile(po)}
+                        className="text-xs"
+                        title="Download Purchase Order CSV"
+                      >
+                        CSV
+                      </Button>
+                      {po.status === 'approved' && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={Boxes}
+                          onClick={() => {
+                            const matchingItem = inventoryItems.find((i) => i.id === po.item_sku || i.name === po.item_name) || {
+                              id: po.item_sku,
+                              name: po.item_name,
+                              stock: 0,
+                              batchNumber: 'BATCH-2026-INWARD'
+                            };
+                            setAdjustmentItem(matchingItem);
+                            setAdjustmentQty(String(po.quantity));
+                            setAdjustmentType('inward');
+                            setAdjustmentReason(`Supplier Delivery Receipt (${po.id})`);
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                        >
+                          Receive Stock
+                        </Button>
+                      )}
+                      {po.status === 'pending_owner_approval' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Trash2}
+                          onClick={() => {
+                            deletePurchaseOrder(po.id);
+                            addToast(`Purchase Order ${po.id} cancelled.`, 'info');
+                          }}
+                          className="text-rose-500 hover:text-rose-600 text-xs"
+                          title="Cancel PO Request"
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!purchaseOrders.length && (
+                <tr>
+                  <td colSpan="8" className="p-8 text-center text-xs text-slate-400">
+                    No purchase orders raised yet. Click <strong>"Raise New PO"</strong> or use the <strong>"PO"</strong> button on low stock items.
                   </td>
                 </tr>
               )}
@@ -1146,17 +1321,17 @@ export const ManagerDashboard = () => {
       <Modal
         isOpen={Boolean(selectedPoItem)}
         onClose={() => setSelectedPoItem(null)}
-        title={`Generate Purchase Order: ${selectedPoItem?.name || ''}`}
+        title={`Raise Purchase Order Request: ${selectedPoItem?.name || ''}`}
       >
         {selectedPoItem && (
-          <div className="space-y-4 text-xs">
+          <form onSubmit={handleSubmitPoForApproval} className="space-y-4 text-xs">
             <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/60 text-slate-700 dark:text-slate-300 space-y-1">
               <div className="flex items-center gap-1.5 font-bold text-indigo-600 dark:text-indigo-400">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>What is a PO (Purchase Order)?</span>
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>2-Step Owner Authorization Workflow</span>
               </div>
               <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
-                A <strong>Purchase Order (PO)</strong> is an official commercial contract sent to wholesale manufacturers or distributors authorizing stock replenishment before goods are shipped to your store.
+                Submitting this PO request routes it directly to the <strong>Business Owner</strong> for budget verification and approval before the order is finalized and dispatched to the supplier.
               </p>
             </div>
 
@@ -1166,7 +1341,7 @@ export const ManagerDashboard = () => {
                 <span className="text-amber-600 dark:text-amber-400">Stock: {selectedPoItem.stock || selectedPoItem.currentStock || 0} Units</span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Category: {selectedPoItem.category} · Unit Rate: ₹{Number(selectedPoItem.unitPriceNum || 199).toLocaleString('en-IN')}
+                Category: {selectedPoItem.category} · Unit Rate: ₹{Number(selectedPoItem.unitPriceNum || selectedPoItem.price || 199).toLocaleString('en-IN')}
               </p>
             </div>
 
@@ -1178,34 +1353,41 @@ export const ManagerDashboard = () => {
                 min="1"
                 value={poQuantity}
                 onChange={(e) => setPoQuantity(e.target.value)}
+                required
               />
               <Input
                 id="poSupplier"
                 label="Wholesale Supplier Name"
                 value={poSupplier}
                 onChange={(e) => setPoSupplier(e.target.value)}
+                required
               />
             </div>
+
+            <Input
+              id="poNotes"
+              label="Manager Restocking Notes / Justification (Optional)"
+              value={poNotes}
+              onChange={(e) => setPoNotes(e.target.value)}
+              placeholder="e.g. Urgent stock replenishment for expected festive customer rush"
+            />
 
             <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex justify-between items-center font-bold text-sm">
               <span>Estimated Order Total:</span>
               <span className="text-indigo-600 dark:text-indigo-400">
-                ₹{(Number(poQuantity || 0) * (selectedPoItem.unitPriceNum || 199)).toLocaleString('en-IN')}
+                ₹{(Number(poQuantity || 0) * (selectedPoItem.unitPriceNum || selectedPoItem.price || 199)).toLocaleString('en-IN')}
               </span>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setSelectedPoItem(null)}>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <Button type="button" variant="outline" onClick={() => setSelectedPoItem(null)}>
                 Cancel
               </Button>
-              <Button variant="outline" icon={FileText} onClick={handleDownloadPoCsv}>
-                Export PO CSV
-              </Button>
-              <Button variant="primary" icon={Mail} onClick={handleEmailPoSupplier}>
-                Dispatch PO Email
+              <Button type="submit" variant="primary" icon={Send} className="font-semibold shadow-md">
+                Submit PO for Owner Approval
               </Button>
             </div>
-          </div>
+          </form>
         )}
       </Modal>
 

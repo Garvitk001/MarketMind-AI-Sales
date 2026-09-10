@@ -360,6 +360,23 @@ export const AnomalyDetectionModule = () => {
           </div>
         </div>
 
+        {/* Sensitivity & Filtering Explanation Guide */}
+        <div className="mt-4 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 text-xs text-slate-600 dark:text-slate-300">
+          <div className="flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold text-slate-900 dark:text-slate-100">
+                Understanding AI Safeguard Sensitivity ({contamination === 0.02 ? '2% Strict' : contamination === 0.10 ? '10% High' : '5% Balanced'})
+              </span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                {contamination === 0.02 && 'Strict mode (2% Contamination cutoff): Flags only the most extreme statistical outliers with >98% deviation from baseline sales or inventory velocity. Minimizes false alerts for high-volume stores.'}
+                {contamination === 0.05 && 'Balanced standard (5% Contamination cutoff): Optimal AI Isolation Forest setting. Scans for billing surges, sudden bulk discounts, stock leakage, and margin erosion.'}
+                {contamination === 0.10 && 'High sensitivity (10% Contamination cutoff): Maximum surveillance net. Catches minor operational variances and subtle transaction deviations for deep store audits.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Anomaly Events Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           {loading ? (

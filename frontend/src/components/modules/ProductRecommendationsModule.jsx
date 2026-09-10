@@ -733,10 +733,27 @@ export const ProductRecommendationsModule = () => {
           recommendationService.getProducts(),
         ]);
         if (custRes.status === 'fulfilled') {
-          setCustomerOptions(custRes.value?.items || []);
+          const rawCusts = custRes.value?.items || [];
+          setCustomerOptions(rawCusts.map((c) => ({
+            id: c.id,
+            external_customer_id: c.external_customer_id || c.id,
+            name: c.company_name || c.contact_name || c.name || c.external_customer_id || 'Client',
+            tier: c.tier || (Number(c.total_revenue || 0) > 50000 ? 'VIP Platinum' : 'Standard Silver')
+          })));
         }
         if (prodRes.status === 'fulfilled') {
-          setProductOptions(prodRes.value?.items || []);
+          const rawProds = prodRes.value?.items || [];
+          const normalized = rawProds.map((item) => {
+            const p = item.product || item;
+            return {
+              id: p.id || item.id,
+              sku: p.sku || item.sku || item.id,
+              name: p.name || item.name,
+              category: p.category || item.category || 'General',
+              unit_price: p.unit_price || item.unit_price || 0
+            };
+          });
+          setProductOptions(normalized);
         }
       } catch {
         // Silently catch
@@ -754,7 +771,7 @@ export const ProductRecommendationsModule = () => {
     }
     setApiError(null);
 
-    const params = { role: userRole };
+    const params = { role: userRole, limit: 20 };
     if (selectedCustomerId) params.customer_id = selectedCustomerId;
     if (selectedSku) params.sku = selectedSku;
     if (selectedCategory) params.category = selectedCategory;
@@ -927,10 +944,13 @@ export const ProductRecommendationsModule = () => {
     { id: 'inventory_clearance', label: 'Inventory Clearance' },
   ];
 
-  const categories = [...new Set([
-    'Terminals', 'Supplies', 'Hardware', 'Networking', 'Software Licenses',
-    ...productOptions.map((p) => p.category).filter(Boolean),
-  ])];
+  const categories = React.useMemo(() => {
+    const fromProducts = (productOptions || []).map((p) => p.category).filter(Boolean);
+    const fromRecs = (recommendations || []).map((r) => r.category).filter(Boolean);
+    const set = new Set([...fromProducts, ...fromRecs]);
+    const list = Array.from(set).filter(Boolean);
+    return list.length > 0 ? list : ['General', 'Apparel', 'FMCG', 'Electronics'];
+  }, [productOptions, recommendations]);
 
   const renderSkeleton = () => (
     <>

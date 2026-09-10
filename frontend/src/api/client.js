@@ -13,7 +13,13 @@ export const API_BASE_URL = rawBaseUrl
   ? normalizeBaseUrl(rawBaseUrl) 
   : `http://${defaultHost}:8000/api/v1`;
 
-export const resolveApiAsset = (path) => path ? `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}` : null;
+export const resolveApiAsset = (path) => {
+  if (!path) return null;
+  if (typeof path === 'string' && (path.startsWith('blob:') || path.startsWith('data:') || path.startsWith('http://') || path.startsWith('https://'))) {
+    return path;
+  }
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+};
 
 const getStoredAccessToken = () => {
   if (typeof window === 'undefined') return null;

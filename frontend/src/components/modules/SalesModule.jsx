@@ -109,8 +109,14 @@ export const SalesModule = () => {
     const matchesSearch = `${deal.displayReference} ${custName} ${deal.source_system || ''}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
-    const matchesPayment = paymentFilter === 'all' || deal.payment_status === paymentFilter;
-    const matchesMethod = methodFilter === 'all' || deal.payment_method === methodFilter;
+    const matchesMethod = methodFilter === 'all' || (() => {
+      const method = String(deal.payment_method || '').toLowerCase().trim();
+      if (methodFilter === 'upi') return method.includes('upi') || method.includes('qr');
+      if (methodFilter === 'cash') return method.includes('cash');
+      if (methodFilter === 'bank_transfer') return method.includes('bank') || method.includes('transfer') || method.includes('neft') || method.includes('rtgs') || method.includes('imps');
+      if (methodFilter === 'other') return method.includes('other') || method.includes('credit') || method.includes('card') || method.includes('cheque') || method.includes('terms');
+      return method === methodFilter.toLowerCase();
+    })();
 
     let matchesDate = true;
     if (deal.occurred_at) {

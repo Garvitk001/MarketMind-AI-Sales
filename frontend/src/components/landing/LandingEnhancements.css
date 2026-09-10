@@ -27,37 +27,26 @@
   mask-image: linear-gradient(to bottom, black, transparent 82%);
 }
 
-/* Public copy stays comfortably readable; dashboard screens keep their compact scale. */
-.marketmind-landing .text-sm {
-  font-size: 1.075rem !important;
-  line-height: 1.8rem !important;
+/* Clean modern font rendering & layout adjustments */
+.marketmind-landing {
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
 }
 
-.marketmind-landing .text-xs {
-  font-size: 0.95rem !important;
-  line-height: 1.45rem !important;
-}
-
-.marketmind-landing [class*="text-[8px]"],
-.marketmind-landing [class*="text-[9px]"],
-.marketmind-landing [class*="text-[10px]"] {
-  font-size: 0.82rem !important;
-  line-height: 1.1rem !important;
-}
-
-.marketmind-landing [class*="text-[11px]"] {
-  font-size: 0.9rem !important;
-  line-height: 1.25rem !important;
+.marketmind-landing h1,
+.marketmind-landing h2,
+.marketmind-landing h3,
+.marketmind-landing .font-extrabold,
+.marketmind-landing .font-black {
+  font-family: 'Outfit', 'Plus Jakarta Sans', 'Inter', sans-serif;
+  letter-spacing: -0.03em;
 }
 
 .marketmind-landing nav button {
-  font-size: 0.96rem !important;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
-.marketmind-landing section h3 {
-  font-size: 1.16rem;
-  line-height: 1.55rem;
-}
 
 /* Layered business-intelligence frame for the hero dashboard. */
 .marketmind-landing #home .max-w-7xl > div:last-child {

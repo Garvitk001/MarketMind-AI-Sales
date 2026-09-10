@@ -4,9 +4,12 @@ import { Card, CardHeader, CardTitle, CardDescription } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
+import { Input } from '../ui/Input';
 import { useData } from '../../context/DataContext';
+
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useToast } from '../../context/ToastContext';
 import { DateRangeFilter } from '../common/DateRangeFilter';
 import {
   Wallet,
@@ -38,8 +41,13 @@ import {
   History,
   FileText,
   Package,
-  CheckCircle
+  CheckCircle,
+  CheckCircle2,
+  XCircle,
+  Edit2,
+  Truck
 } from 'lucide-react';
+
 import {
   ResponsiveContainer,
   AreaChart,
@@ -91,9 +99,20 @@ const getTimeRangeDates = (range) => {
 };
 
 export const OwnerDashboard = ({ onNavigate }) => {
-  const { salesDashboard, customerSummary, salesTransactions = [], customers = [], inventoryItems = [] } = useData();
+  const {
+    salesDashboard,
+    customerSummary,
+    salesTransactions = [],
+    customers = [],
+    inventoryItems = [],
+    purchaseOrders = [],
+    updatePurchaseOrderStatus,
+    editAndApprovePurchaseOrder,
+    deletePurchaseOrder
+  } = useData();
   const { api } = useAuth();
   const { t } = useLanguage();
+  const { addToast } = useToast();
 
   const [execTimeframe, setExecTimeframe] = useState('7_days');
   const [teamData, setTeamData] = useState(null);
@@ -103,6 +122,82 @@ export const OwnerDashboard = ({ onNavigate }) => {
   const [execLogs, setExecLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
+
+  // Purchase Order Approvals state
+  const [poFilterTab, setPoFilterTab] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
+  const [selectedPoForEdit, setSelectedPoForEdit] = useState(null);
+  const [editPoForm, setEditPoForm] = useState({
+    quantity: '',
+    unit_price: '',
+    supplier_name: '',
+    owner_remarks: '',
+  });
+  const [rejectingPo, setRejectingPo] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  const handleQuickApprove = (po) => {
+    updatePurchaseOrderStatus(po.id, 'approved', 'Approved by Business Owner');
+    addToast(`Purchase Order ${po.id} approved & ready for dispatch!`, 'success');
+  };
+
+  const handleOpenEditPoModal = (po) => {
+    setSelectedPoForEdit(po);
+    setEditPoForm({
+      quantity: String(po.quantity),
+      unit_price: String(po.unit_price),
+      supplier_name: po.supplier_name,
+      owner_remarks: po.owner_remarks || 'Approved with adjusted quota by Business Owner',
+    });
+  };
+
+  const handleSaveEditAndApprove = (e) => {
+    e.preventDefault();
+    if (!selectedPoForEdit) return;
+    editAndApprovePurchaseOrder(selectedPoForEdit.id, {
+      quantity: Number(editPoForm.quantity),
+      unit_price: Number(editPoForm.unit_price),
+      supplier_name: editPoForm.supplier_name.trim(),
+      owner_remarks: editPoForm.owner_remarks.trim(),
+    });
+    addToast(`Purchase Order ${selectedPoForEdit.id} modified and approved!`, 'success');
+    setSelectedPoForEdit(null);
+  };
+
+  const handleOpenRejectModal = (po) => {
+    setRejectingPo(po);
+    setRejectionReason('Budget threshold exceeded for this billing cycle');
+  };
+
+  const handleConfirmReject = (e) => {
+    e.preventDefault();
+    if (!rejectingPo) return;
+    updatePurchaseOrderStatus(rejectingPo.id, 'rejected', rejectionReason.trim());
+    addToast(`Purchase Order ${rejectingPo.id} rejected.`, 'info');
+    setRejectingPo(null);
+  };
+
+  const handleDownloadPoCsv = (po) => {
+    if (!po) return;
+    const csvContent =
+      `PURCHASE ORDER,${po.id}\n` +
+      `Date,${(po.created_at || new Date().toISOString()).slice(0, 10)}\n` +
+      `Supplier,${po.supplier_name}\n` +
+      `Store,${po.store_name}\n` +
+      `Status,${po.status.toUpperCase()}\n` +
+      `SKU,Product Name,Category,Quantity,Unit Price (INR),Total Value (INR)\n` +
+      `"${po.item_sku}","${po.item_name}","${po.category}",${po.quantity},${po.unit_price},${po.total_amount}\n` +
+      (po.owner_remarks ? `Owner Remarks,"${po.owner_remarks}"\n` : '');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `PurchaseOrder_${po.id}_${po.item_sku}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast(`Downloaded Purchase Order ${po.id}`, 'info');
+  };
+
 
   useEffect(() => {
     const dates = getTimeRangeDates(execTimeframe);
@@ -210,7 +305,22 @@ export const OwnerDashboard = ({ onNavigate }) => {
     return { outstandingCredit: total, creditAgingData: aging };
   }, [salesTransactions, customers]);
 
+  const poStats = useMemo(() => {
+    const pending = purchaseOrders.filter((p) => p.status === 'pending_owner_approval').length;
+    const approved = purchaseOrders.filter((p) => p.status === 'approved').length;
+    const rejected = purchaseOrders.filter((p) => p.status === 'rejected').length;
+    return { pending, approved, rejected, total: purchaseOrders.length };
+  }, [purchaseOrders]);
+
+  const filteredPurchaseOrders = useMemo(() => {
+    if (poFilterTab === 'pending') return purchaseOrders.filter((p) => p.status === 'pending_owner_approval');
+    if (poFilterTab === 'approved') return purchaseOrders.filter((p) => p.status === 'approved');
+    if (poFilterTab === 'rejected') return purchaseOrders.filter((p) => p.status === 'rejected');
+    return purchaseOrders;
+  }, [purchaseOrders, poFilterTab]);
+
   // Dynamic Product Category Sales & Stock Distribution tailored to this specific Business Owner
+
   const categorySalesData = useMemo(() => {
     if ((!inventoryItems || inventoryItems.length === 0) && (!salesTransactions || salesTransactions.length === 0)) {
       return [];
@@ -1170,8 +1280,379 @@ export const OwnerDashboard = ({ onNavigate }) => {
         )}
       </Modal>
 
+      {/* Edit & Approve Purchase Order Modal */}
+      <Modal
+        isOpen={Boolean(selectedPoForEdit)}
+        onClose={() => setSelectedPoForEdit(null)}
+        title={`Review & Edit Purchase Order: ${selectedPoForEdit?.id || ''}`}
+      >
+        {selectedPoForEdit && (
+          <form onSubmit={handleSaveEditAndApprove} className="space-y-4 text-xs">
+            <div className="p-3 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-indigo-600 dark:text-indigo-400">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Owner Budget &amp; Line-Item Adjustment</span>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                As the Business Owner, you can modify the order quota, negotiated supplier, and unit pricing before providing authorization.
+              </p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1">
+              <div className="flex justify-between font-bold text-slate-900 dark:text-slate-100">
+                <span>Product: {selectedPoForEdit.item_name}</span>
+                <span className="text-indigo-600 dark:text-indigo-400">SKU: {selectedPoForEdit.item_sku}</span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Store: {selectedPoForEdit.store_name} · Requested by: {selectedPoForEdit.created_by_name}
+              </p>
+              {selectedPoForEdit.notes && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 italic pt-1">
+                  Manager Note: "{selectedPoForEdit.notes}"
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                id="editPoQty"
+                label="Approved Quantity (Units)"
+                type="number"
+                min="1"
+                value={editPoForm.quantity}
+                onChange={(e) => setEditPoForm({ ...editPoForm, quantity: e.target.value })}
+                required
+              />
+              <Input
+                id="editPoPrice"
+                label="Negotiated Unit Price (₹ INR)"
+                type="number"
+                min="0"
+                step="0.01"
+                value={editPoForm.unit_price}
+                onChange={(e) => setEditPoForm({ ...editPoForm, unit_price: e.target.value })}
+                required
+              />
+            </div>
+
+            <Input
+              id="editPoSupplier"
+              label="Assigned Wholesale Supplier"
+              value={editPoForm.supplier_name}
+              onChange={(e) => setEditPoForm({ ...editPoForm, supplier_name: e.target.value })}
+              required
+            />
+
+            <Input
+              id="editPoRemarks"
+              label="Owner Approval Remarks / Instructions"
+              value={editPoForm.owner_remarks}
+              onChange={(e) => setEditPoForm({ ...editPoForm, owner_remarks: e.target.value })}
+              placeholder="e.g. Quota approved for upcoming festive inventory buffer"
+            />
+
+            <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 flex justify-between items-center font-bold text-sm">
+              <span className="text-slate-700 dark:text-slate-300">Total Purchase Order Valuation:</span>
+              <span className="text-emerald-600 dark:text-emerald-400">
+                ₹{(Number(editPoForm.quantity || 0) * Number(editPoForm.unit_price || 0)).toLocaleString('en-IN')}
+              </span>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <Button type="button" variant="outline" onClick={() => setSelectedPoForEdit(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" icon={CheckCircle2} className="bg-emerald-600 hover:bg-emerald-700 font-semibold shadow-md">
+                Authorize &amp; Approve PO
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Reject Purchase Order Modal */}
+      <Modal
+        isOpen={Boolean(rejectingPo)}
+        onClose={() => setRejectingPo(null)}
+        title="Reject Purchase Order Request"
+      >
+        {rejectingPo && (
+          <form onSubmit={handleConfirmReject} className="space-y-4 text-xs">
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold text-rose-400 text-sm">
+                <AlertTriangle className="w-4 h-4" />
+                <span>Decline Store Procurement Request</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-300">
+                You are rejecting <strong>{rejectingPo.id}</strong> ({rejectingPo.item_name}, {rejectingPo.quantity} units, ₹{Number(rejectingPo.total_amount).toLocaleString('en-IN')}) for <strong>{rejectingPo.store_name}</strong>.
+              </p>
+            </div>
+
+            <Input
+              id="rejectionReason"
+              label="Rejection Reason / Guidance for Store Manager"
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder="e.g. Budget threshold reached or alternative supplier selected"
+              required
+            />
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <Button type="button" variant="outline" onClick={() => setRejectingPo(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="danger" icon={XCircle} className="font-semibold shadow-md">
+                Confirm Rejection
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Procurement & Purchase Order (PO) Approvals Hub */}
+      <Card hoverEffect={false} className="border-indigo-200/80 dark:border-indigo-900/60 shadow-lg">
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-md shadow-indigo-600/30">
+                <Truck className="w-5 h-5" />
+              </div>
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <span>Procurement &amp; Store PO Approvals Hub</span>
+                  {poStats.pending > 0 ? (
+                    <Badge variant="warning" className="animate-pulse font-bold">
+                      {poStats.pending} Pending Review
+                    </Badge>
+                  ) : (
+                    <Badge variant="success">All Orders Processed</Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Review restocking requests submitted by store managers, authorize commercial budgets, adjust quantities, or reject orders.
+                </CardDescription>
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+              <button
+                type="button"
+                onClick={() => setPoFilterTab('all')}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                  poFilterTab === 'all'
+                    ? 'bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                }`}
+              >
+                All ({poStats.total})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPoFilterTab('pending')}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                  poFilterTab === 'pending'
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-amber-500'
+                }`}
+              >
+                Pending ({poStats.pending})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPoFilterTab('approved')}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                  poFilterTab === 'approved'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-emerald-500'
+                }`}
+              >
+                Approved ({poStats.approved})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPoFilterTab('rejected')}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                  poFilterTab === 'rejected'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-rose-500'
+                }`}
+              >
+                Rejected ({poStats.rejected})
+              </button>
+            </div>
+          </div>
+        </CardHeader>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="uppercase text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+              <tr>
+                <th className="p-3">PO Code &amp; Date</th>
+                <th className="p-3">Store &amp; Requester</th>
+                <th className="p-3">Product Name / SKU</th>
+                <th className="p-3">Quantity &amp; Rate</th>
+                <th className="p-3">Target Supplier</th>
+                <th className="p-3">Order Valuation</th>
+                <th className="p-3">Approval Status</th>
+                <th className="p-3 text-right">Decision Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+              {filteredPurchaseOrders.map((po) => {
+                const isPending = po.status === 'pending_owner_approval';
+                return (
+                  <tr
+                    key={po.id}
+                    className={`transition-colors ${
+                      isPending
+                        ? 'bg-amber-500/5 hover:bg-amber-500/10'
+                        : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/30'
+                    }`}
+                  >
+                    <td className="p-3">
+                      <div className="font-bold text-slate-900 dark:text-slate-100">{po.id}</div>
+                      <div className="text-[11px] text-slate-400">
+                        {new Date(po.created_at || Date.now()).toLocaleDateString('en-IN', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">{po.store_name}</div>
+                      <div className="text-[11px] text-slate-400">{po.created_by_name}</div>
+                    </td>
+                    <td className="p-3">
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">{po.item_name}</div>
+                      <div className="text-[11px] text-slate-400">{po.item_sku} • {po.category}</div>
+                      {po.notes && (
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 italic">
+                          Note: "{po.notes}"
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <div className="font-bold text-slate-900 dark:text-slate-100">
+                        {po.quantity} Units
+                        {po.original_quantity && po.original_quantity !== po.quantity && (
+                          <span className="text-[10px] text-amber-500 font-normal ml-1">
+                            (Req: {po.original_quantity})
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-400">₹{Number(po.unit_price).toLocaleString('en-IN')} / unit</div>
+                    </td>
+                    <td className="p-3">
+                      <div className="font-medium text-slate-800 dark:text-slate-200">{po.supplier_name}</div>
+                    </td>
+                    <td className="p-3">
+                      <div className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">
+                        ₹{Number(po.total_amount).toLocaleString('en-IN')}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      {po.status === 'pending_owner_approval' && (
+                        <Badge variant="warning" className="inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>Pending Review</span>
+                        </Badge>
+                      )}
+                      {po.status === 'approved' && (
+                        <div>
+                          <Badge variant="success" className="inline-flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Approved</span>
+                          </Badge>
+                          {po.owner_remarks && (
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-0.5">
+                              "{po.owner_remarks}"
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {po.status === 'rejected' && (
+                        <div>
+                          <Badge variant="danger" className="inline-flex items-center gap-1">
+                            <XCircle className="w-3 h-3" />
+                            <span>Rejected</span>
+                          </Badge>
+                          {po.owner_remarks && (
+                            <div className="text-[10px] text-rose-500/80 italic mt-0.5">
+                              "{po.owner_remarks}"
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                        {isPending ? (
+                          <>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              icon={CheckCircle2}
+                              onClick={() => handleQuickApprove(po)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                              title="Quick Approve PO"
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              icon={Edit2}
+                              onClick={() => handleOpenEditPoModal(po)}
+                              className="text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 text-xs font-semibold"
+                              title="Edit Quantity/Supplier and Approve"
+                            >
+                              Edit &amp; Approve
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              icon={XCircle}
+                              onClick={() => handleOpenRejectModal(po)}
+                              className="text-rose-500 hover:text-rose-600 text-xs"
+                              title="Reject Purchase Order"
+                            >
+                              Reject
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            icon={Download}
+                            onClick={() => handleDownloadPoCsv(po)}
+                            className="text-xs"
+                            title="Download Approved PO CSV"
+                          >
+                            CSV
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!filteredPurchaseOrders.length && (
+                <tr>
+                  <td colSpan="8" className="p-8 text-center text-xs text-slate-400">
+                    No purchase orders found in this filter category.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
       {/* Category Share & Strategic AI Engine */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
         <Card className="lg:col-span-2 border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/50 via-white to-sky-50/30 dark:from-indigo-950/20 dark:via-slate-900 dark:to-slate-900">
           <CardHeader>
             <div className="flex items-center gap-2">

@@ -215,17 +215,17 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
           currency: 'INR',
           timezone: 'Asia/Kolkata'
         });
-        if (response.token) {
-          setVerifyToken(response.token);
-          setIsVerifyModalOpen(true);
-          addToast(response.message || 'Registration successful. Enter token / OTP to verify.', 'success');
-        } else {
-          setAuthMode('login');
-          addToast(response.message || 'Registration successful! Your account is active. You can now log in.', 'success');
-        }
+        setVerifyToken(response?.token || '');
+        setIsVerifyModalOpen(true);
+        addToast(response?.message || 'Account created! Enter the verification token / OTP to verify.', 'success');
       }
     } catch (error) {
-      setErrorMessage(error.message || 'Unable to complete authentication.');
+      const errMsg = error.message || '';
+      if (errMsg.toLowerCase().includes('already exists') || errMsg.toLowerCase().includes('duplicate')) {
+        setErrorMessage(`An account with email "${trimmedEmail}" already exists. If this email was used for another role (e.g. Business Owner), please register with a new email for this ${selectedRole === 'manager' ? 'Store Manager' : selectedRole === 'sales' ? 'Sales Executive' : 'Business'} account, or sign in directly.`);
+      } else {
+        setErrorMessage(errMsg || 'Unable to complete authentication.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -403,7 +403,11 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
                   ? 'Developer Console'
                   : authMode === 'login'
                   ? 'Sign in to workspace'
-                  : 'Create business account'}
+                  : selectedRole === 'manager'
+                  ? 'Create Store Manager Account'
+                  : selectedRole === 'sales'
+                  ? 'Create Sales Executive Account'
+                  : 'Create Business Owner Account'}
               </h2>
               {!isDeveloperPortal && (
                 <button
@@ -424,6 +428,10 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
                 ? 'Enter 6-digit one-time security passcode to authenticate direct root access.'
                 : authMode === 'login'
                 ? 'Enter credentials or select a pre-configured demo role below.'
+                : selectedRole === 'manager'
+                ? 'Set up a dedicated Store Manager account to manage retail inventory, stores, and POS billing.'
+                : selectedRole === 'sales'
+                ? 'Set up a dedicated Sales Executive account to track leads, deals, and client pipelines.'
                 : 'Set up the first Business Owner account and store for a new workspace.'}
             </p>
           </div>
@@ -510,33 +518,32 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
             </div>
           ) : (
             <>
-              {/* Public Role Selector */}
-              {authMode === 'login' && (
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-400 uppercase tracking-wider">
-                    Demo Access Role:
-                  </label>
-                  <div className="grid grid-cols-3 gap-2 p-1 bg-slate-800/80 rounded-xl border border-slate-700/60">
-                    {MOCK_ROLES.filter((role) => role.id !== 'admin').map((role) => (
-                      <button
-                        key={role.id}
-                        type="button"
-                        onClick={() => handleRoleChange(role.id)}
-                        className={`py-2.5 px-2 rounded-lg text-sm font-medium transition-all text-center flex flex-col items-center gap-1 ${
-                          selectedRole === role.id
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                        }`}
-                      >
-                        <span className="font-semibold truncate w-full">{role.name.split(' ')[0]}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-indigo-400 text-right font-medium">
-                    Active Selection: {MOCK_ROLES.find((r) => r.id === selectedRole)?.name}
-                  </p>
+              {/* Role Selector */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                  {authMode === 'login' ? 'Demo Access Role:' : 'Select Account Role:'}
+                </label>
+                <div className="grid grid-cols-3 gap-2 p-1 bg-slate-800/80 rounded-xl border border-slate-700/60">
+                  {MOCK_ROLES.filter((role) => role.id !== 'admin').map((role) => (
+                    <button
+                      key={role.id}
+                      type="button"
+                      onClick={() => handleRoleChange(role.id)}
+                      className={`py-2.5 px-2 rounded-lg text-sm font-medium transition-all text-center flex flex-col items-center gap-1 ${
+                        selectedRole === role.id
+                          ? 'bg-indigo-600 text-white shadow-md'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                      }`}
+                    >
+                      <span className="font-semibold truncate w-full">{role.name.split(' ')[0]}</span>
+                    </button>
+                  ))}
                 </div>
-              )}
+                <p className="text-xs text-indigo-400 text-right font-medium">
+                  {authMode === 'login' ? 'Active Selection: ' : 'Registering for: '}
+                  <span className="font-bold">{MOCK_ROLES.find((r) => r.id === selectedRole)?.name}</span>
+                </p>
+              </div>
 
               {/* Error Message Alert */}
               {errorMessage && (

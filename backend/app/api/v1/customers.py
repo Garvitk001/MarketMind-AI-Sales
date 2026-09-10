@@ -100,7 +100,14 @@ def list_customers(
     else:
         query, _ = scoped_customer_query(select(Customer), user)
     if search:
-        query = query.where(Customer.external_customer_id.ilike(f"%{search.strip()}%"))
+        search_pattern = f"%{search.strip()}%"
+        query = query.where(
+            (Customer.external_customer_id.ilike(search_pattern))
+            | (Customer.company_name.ilike(search_pattern))
+            | (Customer.contact_email.ilike(search_pattern))
+            | (Customer.contact_phone.ilike(search_pattern))
+            | (Customer.gstin.ilike(search_pattern))
+        )
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     items = db.scalars(
         query.order_by(Customer.total_revenue.desc()).limit(limit).offset(offset)
