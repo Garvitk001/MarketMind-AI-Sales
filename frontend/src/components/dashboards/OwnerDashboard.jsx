@@ -441,7 +441,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
           </div>
           <h2 className="text-2xl font-bold">{t('Wholesale & Business Operations Overview')}</h2>
           <p className="text-sm text-indigo-200 mt-1 max-w-2xl">
-            Live enterprise telemetry tracking sales revenue, client credit ledger aging, batch inventory risks, and strategic AI forecasts.
+            {t('Live enterprise telemetry tracking sales revenue, client credit ledger aging, batch inventory risks, and strategic AI forecasts.')}
           </p>
         </div>
 
@@ -453,7 +453,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
             onClick={() => onNavigate('sales')}
             className="text-xs font-semibold"
           >
-            Create GST Invoice
+            {t('Create GST Invoice')}
           </Button>
           <Button
             variant="glass"
@@ -462,7 +462,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
             onClick={() => onNavigate('reports')}
             className="text-xs font-semibold"
           >
-            Executive Reports
+            {t('Executive Reports')}
           </Button>
         </div>
       </div>
@@ -473,10 +473,10 @@ export const OwnerDashboard = ({ onNavigate }) => {
         <Card className="border-indigo-200 bg-indigo-50/50 dark:border-indigo-900 dark:bg-indigo-950/20" hoverEffect={false}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-bold">Add your first business records</h3>
-              <p className="mt-1 text-sm text-slate-500">Your workspace is correctly isolated. Use Business Setup to import products, inventory, sales, and customers.</p>
+              <h3 className="text-lg font-bold">{t('Add your first business records')}</h3>
+              <p className="mt-1 text-sm text-slate-500">{t('Your workspace is correctly isolated. Use Business Setup to import products, inventory, sales, and customers.')}</p>
             </div>
-            <Button icon={ArrowUpRight} onClick={() => onNavigate('setup')}>Open Business Setup</Button>
+            <Button icon={ArrowUpRight} onClick={() => onNavigate('setup')}>{t('Open Business Setup')}</Button>
           </div>
         </Card>
       )}
@@ -497,7 +497,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 <ArrowUpRight className="w-3.5 h-3.5" />
                 {kpis.totalRevenue.change}
               </span>
-              <span className="text-slate-400">{kpis.totalRevenue.timeFrame}</span>
+              <span className="text-slate-400">{t(kpis.totalRevenue.timeFrame)}</span>
             </div>
           </div>
         </Card>
@@ -516,7 +516,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 <ArrowUpRight className="w-3.5 h-3.5" />
                 {kpis.totalOrders.change}
               </span>
-              <span className="text-slate-400">{kpis.totalOrders.timeFrame}</span>
+              <span className="text-slate-400">{t(kpis.totalOrders.timeFrame)}</span>
             </div>
           </div>
         </Card>
@@ -535,7 +535,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 <ArrowUpRight className="w-3.5 h-3.5" />
                 {kpis.totalCustomers.change}
               </span>
-              <span className="text-slate-400">{kpis.totalCustomers.timeFrame}</span>
+              <span className="text-slate-400">{t(kpis.totalCustomers.timeFrame)}</span>
             </div>
           </div>
         </Card>
@@ -554,7 +554,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 <AlertTriangle className="w-3.5 h-3.5 mr-1" />
                 {kpis.outstandingCredit.change}
               </span>
-              <span className="text-slate-400">{kpis.outstandingCredit.timeFrame}</span>
+              <span className="text-slate-400">{t(kpis.outstandingCredit.timeFrame)}</span>
             </div>
           </div>
         </Card>
@@ -565,10 +565,10 @@ export const OwnerDashboard = ({ onNavigate }) => {
         <Card className="lg:col-span-2">
           <CardHeader>
             <div>
-              <CardTitle>B2B Revenue Trend</CardTitle>
-              <CardDescription>Completed sales from the selected database period</CardDescription>
+              <CardTitle>{t('B2B Revenue Trend')}</CardTitle>
+              <CardDescription>{t('Completed sales from the selected database period')}</CardDescription>
             </div>
-            <Badge variant="info">Live Ledger</Badge>
+            <Badge variant="info">{t('Live Ledger')}</Badge>
           </CardHeader>
           <div className="h-72 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
@@ -596,8 +596,8 @@ export const OwnerDashboard = ({ onNavigate }) => {
         <Card>
           <CardHeader>
             <div>
-              <CardTitle>Credit Receivables Aging</CardTitle>
-              <CardDescription>Commercial buyer credit terms (Net 30/45)</CardDescription>
+              <CardTitle>{t('Credit Receivables Aging')}</CardTitle>
+              <CardDescription>{t('Commercial buyer credit terms (Net 30/45)')}</CardDescription>
             </div>
           </CardHeader>
 
@@ -623,26 +623,26 @@ export const OwnerDashboard = ({ onNavigate }) => {
 
             <div className="grid grid-cols-3 gap-2 text-center text-[11px] pt-1">
               <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                <p className="font-semibold">0–7 Days</p>
+                <p className="font-semibold">{t('0–7 Days')}</p>
                 <p className="font-bold">{money(creditAgingData[0]?.amount || 0)}</p>
               </div>
               <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
-                <p className="font-semibold">8–15 Days</p>
+                <p className="font-semibold">{t('8–15 Days')}</p>
                 <p className="font-bold">{money(creditAgingData[1]?.amount || 0)}</p>
               </div>
               <div className="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400">
-                <p className="font-semibold">15+ Days</p>
+                <p className="font-semibold">{t('15+ Days')}</p>
                 <p className="font-bold">{money(creditAgingData[2]?.amount || 0)}</p>
               </div>
             </div>
 
             <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">
               <div className="flex justify-between items-center text-slate-400">
-                <span>Total Credit Issued:</span>
+                <span>{t('Total Credit Issued:')}</span>
                 <span className="font-bold text-slate-200">{money(outstandingCredit)}</span>
               </div>
               <div className="flex justify-between items-center text-rose-400 font-semibold">
-                <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Overdue (15+ Days):</span>
+                <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {t('Overdue (15+ Days):')}</span>
                 <span>{money(creditAgingData[2]?.amount || 0)}</span>
               </div>
             </div>
@@ -656,15 +656,15 @@ export const OwnerDashboard = ({ onNavigate }) => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <span>Category Sales & Revenue Distribution</span>
-                <Badge variant="success">Product Analytics</Badge>
+                <span>{t('Category Sales & Revenue Distribution')}</span>
+                <Badge variant="success">{t('Product Analytics')}</Badge>
               </CardTitle>
               <CardDescription>
-                Live revenue and catalog contribution breakdown across distinct product categories
+                {t('Live revenue and catalog contribution breakdown across distinct product categories')}
               </CardDescription>
             </div>
             <div className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg">
-              Total Categories: <strong className="text-indigo-600 dark:text-indigo-400">{categorySalesData.length}</strong>
+              {t('Total Categories:')} <strong className="text-indigo-600 dark:text-indigo-400">{categorySalesData.length}</strong>
             </div>
           </div>
         </CardHeader>
@@ -675,9 +675,9 @@ export const OwnerDashboard = ({ onNavigate }) => {
               <Package className="w-6 h-6" />
             </div>
             <div className="max-w-md space-y-1">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">No Product Categories or Transactions Recorded</h4>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">{t('No Product Categories or Transactions Recorded')}</h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Live revenue and catalog contribution breakdown across distinct product categories will appear once you add opening inventory or record sales orders.
+                {t('Live revenue and catalog contribution breakdown across distinct product categories will appear once you add opening inventory or record sales orders.')}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
@@ -688,7 +688,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 icon={PackagePlus}
                 className="text-xs font-semibold shadow-md shadow-indigo-600/20"
               >
-                Set Up Product Catalog
+                {t('Set Up Product Catalog')}
               </Button>
               <Button
                 variant="outline"
@@ -697,7 +697,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 icon={Store}
                 className="text-xs font-semibold"
               >
-                Go to Inventory
+                {t('Go to Inventory')}
               </Button>
             </div>
           </div>
@@ -783,11 +783,11 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 </div>
                 <div>
                   <CardTitle className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <span>Individual Sales Executive Sales Telemetry</span>
-                    <Badge variant="info">Live Staff Telemetry</Badge>
+                    <span>{t('Sales Staff Performance & Telemetry')}</span>
+                    <Badge variant="info">{t('Live Staff Telemetry')}</Badge>
                   </CardTitle>
                   <CardDescription>
-                    Real-time individual employee sales revenue, closed orders, and target progress across custom periods.
+                    {t('Track live sales volume, closed invoices, and target pacing across individual staff')}
                   </CardDescription>
                 </div>
               </div>
@@ -798,11 +798,11 @@ export const OwnerDashboard = ({ onNavigate }) => {
               {/* Period Selectors */}
               <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                 {[
-                  { id: 'today', label: 'Today' },
-                  { id: 'yesterday', label: 'Yesterday' },
-                  { id: '7_days', label: '7 Days' },
-                  { id: '30_days', label: '30 Days' },
-                  { id: '6_months', label: '6 Months' },
+                  { id: 'today', label: t('Today') },
+                  { id: 'yesterday', label: t('Yesterday') },
+                  { id: '7_days', label: t('7 Days') },
+                  { id: '30_days', label: t('30 Days') },
+                  { id: '6_months', label: t('6 Months') },
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -823,7 +823,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search executive..."
+                  placeholder={t('Search executive...')}
                   value={execSearch}
                   onChange={(e) => setExecSearch(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
@@ -837,7 +837,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                   className={`p-1.5 rounded-lg transition ${
                     viewMode === 'cards' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow' : 'text-slate-400'
                   }`}
-                  title="Grid Cards View"
+                  title={t('Grid Cards View')}
                 >
                   <LayoutGrid className="w-3.5 h-3.5" />
                 </button>
@@ -846,7 +846,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                   className={`p-1.5 rounded-lg transition ${
                     viewMode === 'table' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow' : 'text-slate-400'
                   }`}
-                  title="Table Comparison View"
+                  title={t('Table Comparison View')}
                 >
                   <List className="w-3.5 h-3.5" />
                 </button>
@@ -867,13 +867,13 @@ export const OwnerDashboard = ({ onNavigate }) => {
               <Users className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-900 dark:text-slate-100">No Sales Executives Found</p>
+              <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{t('No Sales Executives Found')}</p>
               <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
-                Add sales executives and staff to your business to track their individual sales, invoice receipts, and commission targets.
+                {t('Add sales executives and staff to your business to track their individual sales, invoice receipts, and commission targets.')}
               </p>
             </div>
             <Button size="sm" variant="primary" icon={ArrowUpRight} onClick={() => onNavigate('team')}>
-              Add Sales Executives in Team Tab
+              {t('Add Sales Executives in Team Tab')}
             </Button>
           </div>
         ) : viewMode === 'cards' ? (
@@ -935,7 +935,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                     {/* Sales Metrics Grid */}
                     <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800/80">
                       <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Period Sales</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('Period Sales')}</span>
                         <p className="text-base font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
                           {money(rev)}
                         </p>
@@ -952,7 +952,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                       </div>
 
                       <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Orders Closed</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('Orders Closed')}</span>
                         <p className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">
                           {txCount} <span className="text-xs font-normal text-slate-400">invoices</span>
                         </p>
@@ -968,7 +968,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                         <div className="flex justify-between text-xs">
                           <span className="text-[11px] text-slate-400 flex items-center gap-1">
                             <Target className="w-3 h-3 text-indigo-400" />
-                            Target: {money(targetVal)}
+                            {t('Target')}: {money(targetVal)}
                           </span>
                           <span className="font-bold text-slate-900 dark:text-slate-100">
                             {completion}%
@@ -989,8 +989,8 @@ export const OwnerDashboard = ({ onNavigate }) => {
                       </div>
                     ) : (
                       <div className="text-[11px] text-slate-400 flex items-center justify-between">
-                        <span>Assigned Target: Standard Sales Quota</span>
-                        <span className="text-indigo-400 font-semibold">{txCount} Closed Deals</span>
+                        <span>{t('Assigned Target: Standard Sales Quota')}</span>
+                        <span className="text-indigo-400 font-semibold">{txCount} {t('Closed Deals')}</span>
                       </div>
                     )}
                   </div>
@@ -1005,7 +1005,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                       className="text-xs text-indigo-500 hover:text-indigo-400 font-bold flex items-center gap-1 group-hover:underline"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      Inspect History
+                      {t('Inspect History')}
                     </button>
                   </div>
                 </div>
@@ -1018,14 +1018,14 @@ export const OwnerDashboard = ({ onNavigate }) => {
             <table className="w-full text-left text-xs">
               <thead className="uppercase text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="p-3">Sales Executive</th>
-                  <th className="p-3">Assigned Store</th>
-                  <th className="p-3">Period Sales Revenue</th>
-                  <th className="p-3">Closed Orders</th>
+                  <th className="p-3">{t('Sales Executive')}</th>
+                  <th className="p-3">{t('Assigned Store')}</th>
+                  <th className="p-3">{t('Period Sales')}</th>
+                  <th className="p-3">{t('Orders Closed')}</th>
                   <th className="p-3">Items Sold</th>
                   <th className="p-3">Avg Ticket (AOV)</th>
-                  <th className="p-3">Target Completion</th>
-                  <th className="p-3 text-right">Actions</th>
+                  <th className="p-3">{t('Target Progress')}</th>
+                  <th className="p-3 text-right">{t('Actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -1419,17 +1419,17 @@ export const OwnerDashboard = ({ onNavigate }) => {
               </div>
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  <span>Procurement &amp; Store PO Approvals Hub</span>
+                  <span>{t('Procurement & Store PO Approvals')}</span>
                   {poStats.pending > 0 ? (
                     <Badge variant="warning" className="animate-pulse font-bold">
-                      {poStats.pending} Pending Review
+                      {poStats.pending} {t('Pending Review')}
                     </Badge>
                   ) : (
-                    <Badge variant="success">All Orders Processed</Badge>
+                    <Badge variant="success">{t('All Orders Processed')}</Badge>
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Review restocking requests submitted by store managers, authorize commercial budgets, adjust quantities, or reject orders.
+                  {t('Authorize, adjust, or decline supplier stock requests submitted by Store Managers')}
                 </CardDescription>
               </div>
             </div>
@@ -1445,7 +1445,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
-                All ({poStats.total})
+                {t('All')} ({poStats.total})
               </button>
               <button
                 type="button"
@@ -1456,7 +1456,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                     : 'text-slate-600 dark:text-slate-400 hover:text-amber-500'
                 }`}
               >
-                Pending ({poStats.pending})
+                {t('Pending')} ({poStats.pending})
               </button>
               <button
                 type="button"
@@ -1467,7 +1467,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                     : 'text-slate-600 dark:text-slate-400 hover:text-emerald-500'
                 }`}
               >
-                Approved ({poStats.approved})
+                {t('Approved')} ({poStats.approved})
               </button>
               <button
                 type="button"
@@ -1478,7 +1478,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                     : 'text-slate-600 dark:text-slate-400 hover:text-rose-500'
                 }`}
               >
-                Rejected ({poStats.rejected})
+                {t('Rejected')} ({poStats.rejected})
               </button>
             </div>
           </div>
@@ -1488,14 +1488,14 @@ export const OwnerDashboard = ({ onNavigate }) => {
           <table className="w-full text-left text-xs">
             <thead className="uppercase text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="p-3">PO Code &amp; Date</th>
-                <th className="p-3">Store &amp; Requester</th>
-                <th className="p-3">Product Name / SKU</th>
-                <th className="p-3">Quantity &amp; Rate</th>
-                <th className="p-3">Target Supplier</th>
-                <th className="p-3">Order Valuation</th>
-                <th className="p-3">Approval Status</th>
-                <th className="p-3 text-right">Decision Actions</th>
+                <th className="p-3">{t('PO Code & Date')}</th>
+                <th className="p-3">{t('Store & Requester')}</th>
+                <th className="p-3">{t('Product Name / SKU')}</th>
+                <th className="p-3">{t('Quantity & Rate')}</th>
+                <th className="p-3">{t('Target Supplier')}</th>
+                <th className="p-3">{t('Order Valuation')}</th>
+                <th className="p-3">{t('Approval Status')}</th>
+                <th className="p-3 text-right">{t('Decision Actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -1556,14 +1556,14 @@ export const OwnerDashboard = ({ onNavigate }) => {
                       {po.status === 'pending_owner_approval' && (
                         <Badge variant="warning" className="inline-flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          <span>Pending Review</span>
+                          <span>{t('Pending Review')}</span>
                         </Badge>
                       )}
                       {po.status === 'approved' && (
                         <div>
                           <Badge variant="success" className="inline-flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" />
-                            <span>Approved</span>
+                            <span>{t('Approved & Dispatched')}</span>
                           </Badge>
                           {po.owner_remarks && (
                             <div className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-0.5">
@@ -1576,7 +1576,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                         <div>
                           <Badge variant="danger" className="inline-flex items-center gap-1">
                             <XCircle className="w-3 h-3" />
-                            <span>Rejected</span>
+                            <span>{t('Rejected by Owner')}</span>
                           </Badge>
                           {po.owner_remarks && (
                             <div className="text-[10px] text-rose-500/80 italic mt-0.5">
@@ -1596,9 +1596,9 @@ export const OwnerDashboard = ({ onNavigate }) => {
                               icon={CheckCircle2}
                               onClick={() => handleQuickApprove(po)}
                               className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
-                              title="Quick Approve PO"
+                              title={t('Quick Approve')}
                             >
-                              Approve
+                              {t('Quick Approve')}
                             </Button>
                             <Button
                               variant="outline"
@@ -1606,9 +1606,9 @@ export const OwnerDashboard = ({ onNavigate }) => {
                               icon={Edit2}
                               onClick={() => handleOpenEditPoModal(po)}
                               className="text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 text-xs font-semibold"
-                              title="Edit Quantity/Supplier and Approve"
+                              title={t('Edit & Approve')}
                             >
-                              Edit &amp; Approve
+                              {t('Edit & Approve')}
                             </Button>
                             <Button
                               variant="ghost"
@@ -1616,9 +1616,9 @@ export const OwnerDashboard = ({ onNavigate }) => {
                               icon={XCircle}
                               onClick={() => handleOpenRejectModal(po)}
                               className="text-rose-500 hover:text-rose-600 text-xs"
-                              title="Reject Purchase Order"
+                              title={t('Reject')}
                             >
-                              Reject
+                              {t('Reject')}
                             </Button>
                           </>
                         ) : (
@@ -1628,7 +1628,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                             icon={Download}
                             onClick={() => handleDownloadPoCsv(po)}
                             className="text-xs"
-                            title="Download Approved PO CSV"
+                            title={t('Export PO')}
                           >
                             CSV
                           </Button>

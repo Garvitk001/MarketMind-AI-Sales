@@ -7,6 +7,7 @@ import { Modal } from '../ui/Modal';
 import { CardSkeleton, Skeleton } from '../ui/Skeleton';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { MOCK_CUSTOMERS, MOCK_MANAGER_DATA } from '../../data/mockData';
 import recommendationService from '../../services/recommendationService';
 import {
@@ -685,10 +686,11 @@ function RecCard({ rec, userRole, onAddToQuote, onCopyPitch }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export const ProductRecommendationsModule = () => {
+export const ProductRecommendationsModule = ({ initialCustomerId, initialSku }) => {
   const { addToast } = useToast();
-  const { currentRole } = useAuth();
-  const userRole = currentRole?.id || 'owner';
+  const { profile } = useAuth();
+  const { t } = useLanguage();
+  const userRole = profile?.role?.id || 'owner';
 
   // ── Core data state
   const [recommendations, setRecommendations] = useState([]);
@@ -1020,10 +1022,10 @@ export const ProductRecommendationsModule = () => {
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-semibold">
             <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span>{roleHeader.badge}</span>
+            <span>{t(roleHeader.badge)}</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Product Recommendations & Cross-Sell Hub</h1>
-          <p className="text-sm text-indigo-200">{roleHeader.description}</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('AI-Powered Product Recommendations')}</h1>
+          <p className="text-sm text-indigo-200">{t(roleHeader.description)}</p>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -1033,7 +1035,7 @@ export const ProductRecommendationsModule = () => {
             icon={Download}
             className="bg-white/10 hover:bg-white/20 text-white border-white/20"
           >
-            Export Catalog CSV
+            {t('Export CSV')}
           </Button>
           <Button
             variant="glass"
@@ -1042,7 +1044,7 @@ export const ProductRecommendationsModule = () => {
             isLoading={refreshing}
             icon={RefreshCw}
           >
-            Refresh
+            {t('Refresh')}
           </Button>
         </div>
       </div>
@@ -1092,9 +1094,9 @@ export const ProductRecommendationsModule = () => {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-indigo-500" />
-                  <span>Product Recommender Controls &amp; Personalization</span>
+                  <span>{t('Product Recommended Controls')}</span>
                 </CardTitle>
-                <CardDescription>Filter recommended products by B2B Client Account, Base SKU, Category, or Strategy</CardDescription>
+                <CardDescription>{t('Dynamic cross-sell, up-sell, and basket affinity recommendations')}</CardDescription>
               </div>
             </CardHeader>
 

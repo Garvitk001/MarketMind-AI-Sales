@@ -9,7 +9,7 @@ const TRANSLATIONS = {
     'AI Chat System': 'एआई चैट सिस्टम',
     'Sales Deals': 'बिक्री सौदे',
     'Inventory': 'स्टॉक इन्वेंटरी',
-    'Customers': 'ग्राहक',
+    'Customers': 'ग्राहक डायरेक्टरी',
     'AI Recommender': 'एआई सिफारिशें',
     'Churn Analytics': 'ग्राहक रिटेंशन',
     'Anomaly Alerts': 'सुरक्षा अलर्ट',
@@ -22,11 +22,23 @@ const TRANSLATIONS = {
     'Safeguard': 'सुरक्षा',
     'System Admin Console': 'सिस्टम एडमिन कंसोल',
     'System Administration': 'सिस्टम प्रशासन',
+    'Stock Alerts': 'स्टॉक अलर्ट',
+    'Store Operations': 'स्टोर ऑपरेशन्स',
+    'Field Operations': 'फील्ड ऑपरेशन्स',
+    'Executive HQ': 'एग्जीक्यूटिव मुख्यालय',
+    'Super Admin': 'सुपर एडमिन',
+    'Active Workspace View': 'सक्रिय वर्कस्पेस दृश्य',
 
-    // Dashboards & Headers
+    // Role Names
     'Business Owner': 'बिजनेस मालिक',
-    'Business Owner View': 'बिजनेस मालिक अवलोकन',
+    'Business Owner View': 'बिजनेस मालिक दृश्य',
     'Owner Access': 'मालिक पहुंच',
+    'Store Manager': 'स्टोर मैनेजर',
+    'Sales Executive': 'सेल्स एक्जीक्यूटिव',
+    'Platform Administrator': 'प्लेटफ़ॉर्म व्यवस्थापक',
+    'Admin': 'एडमिन',
+
+    // Top Summary & Owner Dashboard KPIs
     'Total Revenue': 'कुल राजस्व',
     'Total Net Revenue': 'कुल शुद्ध राजस्व',
     'B2B Orders Processed': 'संसाधित B2B ऑर्डर्स',
@@ -35,6 +47,26 @@ const TRANSLATIONS = {
     'Total Orders': 'कुल ऑर्डर',
     'Active Customers': 'सक्रिय ग्राहक',
     'Average Order Value': 'औसत ऑर्डर मूल्य',
+    'Period Sales': 'अवधि बिक्री',
+    'Orders Closed': 'सफल इनवॉइस',
+    'Target': 'लक्ष्य',
+    'Assigned Target: Standard Sales Quota': 'निर्धारित लक्ष्य: मानक बिक्री कोटा',
+    'Assigned Target': 'निर्धारित लक्ष्य',
+    'Closed Deals': 'बंद सौदे',
+    'Inspect History': 'इतिहास जांचें',
+    'Activity Audit': 'गतिविधि ऑडिट',
+    'View Activity Trail': 'गतिविधि विवरण देखें',
+    'Gross Profit Margin': 'सकल लाभ मार्जिन',
+    'Total In Stock Units': 'कुल उपलब्ध स्टॉक इकाइयां',
+    'Revenue Growth': 'राजस्व वृद्धि',
+    'Growth vs Last Period': 'पिछली अवधि की तुलना में वृद्धि',
+    'Avg Basket Size': 'औसत बास्केट साइज',
+
+    // Owner Dashboard Sections
+    'Procurement & Store PO Approvals': 'खरीद एवं स्टोर पीओ अनुमोदन',
+    'Authorize, adjust, or decline supplier stock requests submitted by Store Managers': 'स्टोर मैनेजर द्वारा प्रस्तुत आपूर्तिकर्ता स्टॉक अनुरोधों को अधिकृत, संशोधित या अस्वीकार करें',
+    'Sales Staff Performance & Telemetry': 'सेल्स स्टाफ प्रदर्शन एवं टेलीमेट्री',
+    'Track live sales volume, closed invoices, and target pacing across individual staff': 'व्यक्तिगत स्टाफ की लाइव बिक्री मात्रा, इनवॉइस और लक्ष्य प्रगति ट्रैक करें',
     'AI Strategic Insights Engine': 'एआई रणनीतिक अंतर्दृष्टि इंजन',
     'Real-time predictive insights from your recommendations, churn, and safeguard engines.': 'आपकी एआई सिफारिशों, रिटेंशन और सुरक्षा इंजनों से रीयल-टाइम जानकारी।',
     'Top Revenue Products': 'शीर्ष राजस्व उत्पाद',
@@ -54,49 +86,115 @@ const TRANSLATIONS = {
     'Add your first business records': 'अपने पहले व्यावसायिक रिकॉर्ड जोड़ें',
     'Your workspace is correctly isolated. Use Business Setup to import products, inventory, sales, and customers.': 'आपका वर्कस्पेस सुरक्षित है। उत्पाद, इन्वेंटरी, बिक्री और ग्राहक जोड़ने के लिए बिजनेस सेटअप का उपयोग करें।',
     'Open Business Setup': 'बिजनेस सेटअप खोलें',
+    'Add Sales Executives in Team Tab': 'टीम टैब में सेल्स एक्जीक्यूटिव जोड़ें',
+    'No Sales Executives Found': 'कोई सेल्स एक्जीक्यूटिव नहीं मिला',
+    'Add sales executives and staff to your business to track their individual sales, invoice receipts, and commission targets.': 'व्यक्तिगत बिक्री, इनवॉइस और कमीशन लक्ष्य ट्रैक करने के लिए सेल्स टीम जोड़ें।',
 
-    // Store Manager & Inventory
+    // PO Statuses & Badges
+    'Pending Owner Approval': 'मालिक की स्वीकृति प्रतीक्षित',
+    'Approved & Dispatched': 'स्वीकृत एवं प्रेषित',
+    'Rejected by Owner': 'मालिक द्वारा अस्वीकृत',
+    'Quick Approve': 'त्वरित स्वीकृति',
+    'Edit & Approve': 'संपादित करें और स्वीकृत करें',
+    'Reject': 'अस्वीकार करें',
+    'Reject PO': 'पीओ अस्वीकार करें',
+    'Export PO': 'पीओ निर्यात करें',
+    'Receive Stock': 'स्टॉक प्राप्त करें',
+    'Email Supplier': 'आपूर्तिकर्ता को ईमेल करें',
+    'Pending Approvals': 'लंबित स्वीकृतियां',
+    'Approved Orders': 'स्वीकृत ऑर्डर्स',
+    'Rejected Orders': 'अस्वीकृत ऑर्डर्स',
+    'All Requests': 'सभी अनुरोध',
+    'Raise PO Request': 'नया पीओ अनुरोध भेजें',
+    'Raise PO': 'पीओ बनाएं',
+    'Stock Units Needed': 'आवश्यक स्टॉक इकाइयां',
+    'Estimated Unit Price (₹)': 'अनुमानित इकाई मूल्य (₹)',
+    'Supplier / Vendor': 'आपूर्तिकर्ता / विक्रेता',
+    'Manager Justification / Notes': 'मैनेजर का विवरण / नोट्स',
+    'Submit PO for Owner Approval': 'मालिक के अनुमोदन हेतु पीओ भेजें',
+    'Edit & Authorize Purchase Order': 'परचेज ऑर्डर संपादित व स्वीकृत करें',
+    'Approved Quantity': 'स्वीकृत मात्रा',
+    'Negotiated Unit Price (₹)': 'तय किया गया इकाई मूल्य (₹)',
+    'Owner Authorization Remarks': 'मालिक के अनुमोदन निर्देश / नोट्स',
+    'Confirm & Authorize PO': 'पुष्टि करें और अधिकृत करें',
+    'Rejection Reason & Guidance': 'अस्वीकृति का कारण व निर्देश',
+    'Confirm Rejection': 'अस्वीकृति की पुष्टि करें',
+
+    // Store Manager Dashboard
     'Store Manager Operations Dashboard': 'स्टोर मैनेजर ऑपरेशन्स डैशबोर्ड',
     'Store Manager Operations': 'स्टोर मैनेजर ऑपरेशन्स',
-    'Create Purchase Order': 'नया परचेज ऑर्डर बनाएं',
+    'Inventory stock levels, low-stock reorder triggers, and supplier purchase orders': 'इन्वेंटरी स्टॉक स्तर, कम स्टॉक पुनः ऑर्डर और आपूर्तिकर्ता परचेज ऑर्डर',
     'Total Active SKUs': 'कुल सक्रिय उत्पाद (SKUs)',
     'Low Stock Alert': 'कम स्टॉक अलर्ट',
-    'Out of Stock': 'आउट ऑफ स्टॉक',
-    'Pending Shipments': 'पेंडिंग शिपमेंट',
     'Low Stock Priority Queue': 'कम स्टॉक प्राथमिकता सूची',
+    'Items below safety reorder threshold requiring supplier replenishment': 'सुरक्षा स्तर से कम स्टॉक जिन्हें आपूर्तिकर्ता से पुनः मंगाने की आवश्यकता है',
     'Real-Time Stock Inventory': 'रीयल-टाइम स्टॉक इन्वेंटरी',
     'All Store Branches': 'सभी स्टोर शाखाएं',
     'Main Demo Store': 'मुख्य डेमो स्टोर',
-    'Dispatch PO': 'पीओ डिस्पैच करें',
-    'Send Email': 'ईमेल भेजें',
-    'PO Number': 'पीओ नंबर',
-    'Supplier': 'आपूर्तिकर्ता',
-    'Stock Units': 'स्टॉक यूनिट्स',
-    'Reorder Level': 'पुनः ऑर्डर स्तर',
+    'Add New Product': 'नया उत्पाद जोड़ें',
+    'Product Catalog': 'उत्पाद कैटलॉग',
+    'Current Stock': 'वर्तमान स्टॉक',
+    'Safety Reorder Level': 'सुरक्षा पुनः ऑर्डर स्तर',
+    'Unit Cost (₹)': 'इकाई लागत (₹)',
+    'Inventory Value': 'इन्वेंटरी मूल्य',
+    'Stock Status': 'स्टॉक स्थिति',
+    'In Stock': 'पर्याप्त स्टॉक',
+    'Low Stock': 'कम स्टॉक',
+    'Critical Out of Stock': 'गंभीर: स्टॉक समाप्त',
+    'Dispatched / In Transit': 'भेज दिया गया / रास्ते में',
 
-    // Sales Executive & Deals
+    // Sales Executive Dashboard
     'Sales Executive Dashboard': 'सेल्स एक्जीक्यूटिव डैशबोर्ड',
+    'Field sales pipeline, daily customer transactions, and target pacing': 'फील्ड बिक्री पाइपलाइन, दैनिक ग्राहक लेनदेन और लक्ष्य प्रगति',
     'Sales Pipeline': 'बिक्री पाइपलाइन',
     'Monthly Sales Target': 'मासिक बिक्री लक्ष्य',
     'Pipeline Deals': 'पाइपलाइन सौदे',
     'Target Progress': 'लक्ष्य प्रगति',
     'Active Deals': 'सक्रिय सौदे',
     'Win Rate': 'सफलता दर',
-    'All Payment Methods': 'सभी भुगतान विधियां',
-    'UPI': 'यूपीआई (UPI)',
-    'Cash': 'नकद (Cash)',
-    'Bank Transfer': 'बैंक ट्रांसफर',
-    'Credit / Net Terms': 'क्रेडिट / नेट शर्तें',
-    'Filter Deals': 'सौदे फ़िल्टर करें',
-    'Create New Deal': 'नया सौदा जोड़ें',
-    'Stage': 'चरण',
-    'Deal Value': 'सौदा मूल्य',
-    'Expected Close': 'अपेक्षित समाप्ति',
+    'New B2B Invoice': 'नया B2B इनवॉइस',
+    'Export Sales Register': 'बिक्री रजिस्टर निर्यात करें',
+    'Sales & B2B Invoicing Ledger': 'बिक्री एवं B2B इनवॉइस बहीखाता',
+    'Commercial wholesale ledger, credit terms, collections, and statutory GST Tax Invoice generation': 'व्यापारिक थोक बहीखाता, क्रेडिट शर्तें, वसूली और वैधानिक जीएसटी टैक्स इनवॉइस निर्माण',
+    'Total Sales Volume': 'कुल बिक्री मात्रा',
+    'Cleared Cash': 'प्राप्त नकद भुगतान',
+    'Outstanding Credit': 'बकाया उधारी (क्रेडिट)',
+    'Overdue Accounts': 'अतिदेय खाते (Overdue)',
+    'Search invoice, client, or ref...': 'इनवॉइस, ग्राहक या संदर्भ खोजें...',
+    'All Invoices': 'सभी इनवॉइस',
+    'Paid': 'भुगतान पूर्ण',
+    'Unpaid': 'अदत्त (बकाया)',
+    'Overdue': 'अतिदेय (Overdue)',
+    'Mark as Paid': 'भुगतान दर्ज करें',
+    'Invoice & Order Type': 'इनवॉइस एवं ऑर्डर प्रकार',
+    'Client Company / Retailer': 'ग्राहक कंपनी / व्यापारी',
+    'Status & Terms': 'स्थिति एवं शर्तें',
+    'Invoice Amount': 'इनवॉइस राशि',
+    'Items / Volume': 'आइटम / मात्रा',
+    'Commercial Actions': 'व्यापारिक कार्रवाई',
 
-    // Customers & B2B
+    // Payment Methods
+    'All Payment Methods': 'सभी भुगतान विधियां',
+    'UPI': 'यूपीआई (UPI / QR)',
+    'UPI / QR Code': 'यूपीआई / क्यूआर कोड',
+    'Cash': 'नकद (Cash)',
+    'Cash Counter': 'नकद काउंटर',
+    'Bank Transfer': 'बैंक ट्रांसफर (NEFT/RTGS)',
+    'Bank Transfer (NEFT)': 'बैंक ट्रांसफर (NEFT)',
+    'Credit Ledger / Other': 'उधार खाता / अन्य',
+    'Credit / Net Terms': 'क्रेडिट / नेट शर्तें',
+
+    // Customer & B2B Directory
     'B2B Customer Directory': 'B2B ग्राहक डायरेक्टरी',
+    'Manage enterprise client accounts, credit limits, outstanding balances, and GSTIN details': 'व्यापारिक ग्राहक खाते, क्रेडिट सीमा, बकाया राशि और जीएसटी विवरण प्रबंधित करें',
     'Add New Client': 'नया ग्राहक जोड़ें',
+    'Add New B2B Client': 'नया B2B ग्राहक जोड़ें',
     'Search Clients...': 'ग्राहक खोजें...',
+    'Search clients by name, GSTIN, phone, or company...': 'नाम, जीएसटी, फोन या कंपनी से ग्राहक खोजें...',
+    'Total Clients': 'कुल ग्राहक',
+    'Active Credit Volume': 'सक्रिय क्रेडिट मात्रा',
+    'Avg Payment Cycle': 'औसत भुगतान चक्र',
+    'Days': 'दिन',
     'Credit Limit': 'क्रेडिट सीमा',
     'Outstanding Balance': 'बकाया राशि',
     'Payment Terms': 'भुगतान शर्तें',
@@ -104,18 +202,32 @@ const TRANSLATIONS = {
     'Contact Person': 'संपर्क व्यक्ति',
     'Phone Number': 'फ़ोन नंबर',
     'Email Address': 'ईमेल पता',
+    'GSTIN Number': 'जीएसटी नंबर',
+    'Billing Address': 'बिलिंग पता',
+    'Segment Tier': 'ग्राहक वर्ग',
+    'Champions': 'सर्वश्रेष्ठ ग्राहक (Champions)',
+    'Loyal Customers': 'वफादार ग्राहक (Loyal)',
+    'At Risk': 'जोखिम में (At Risk)',
+    'Hibernating': 'निष्क्रिय ग्राहक (Hibernating)',
 
     // AI Recommender
     'AI-Powered Product Recommendations': 'एआई उत्पाद सिफारिशें',
+    'Dynamic cross-sell, up-sell, and basket affinity recommendations': 'क्रॉस-सेल, अप-सेल और बास्केट एफ़िनिटी उत्पाद सिफारिशें',
     'Product Recommended Controls': 'उत्पाद सिफारिश नियंत्रण',
     'Target B2B Account': 'लक्षित B2B खाता',
+    'All B2B Accounts': 'सभी B2B खाते',
     'Base Product / Anchor SKU': 'मूल उत्पाद / एंकर SKU',
+    'All Products': 'सभी उत्पाद',
     'All Categories': 'सभी श्रेणियां',
+    'Recommended Product': 'अनुशंसित उत्पाद',
     'Confidence Score': 'विश्वसनीयता स्कोर',
     'Bundle Lift': 'बंडल वृद्धि दर',
+    'Expected Revenue Uplift': 'अपेक्षित राजस्व वृद्धि',
+    'Top Recommendations Limit': 'शीर्ष सिफारिशें सीमा',
+    'Apply Recommendation': 'सिफारिश लागू करें',
 
-    // Churn & Retention
-    'At-Risk Customer Retention Center': 'ग्राहक रिटेंशन सेंटर',
+    // Churn Analytics
+    'At-Risk Customer Retention Center': 'ग्राहक रिटेंशन केंद्र',
     'Identify slipping accounts early and launch 1-click discount offers or executive calls to protect your revenue.': 'कम होते ग्राहकों को जल्दी पहचानें और 1-क्लिक ऑफर से अपना राजस्व बचाएं।',
     'Analyzed Accounts': 'विश्लेषण किए गए खाते',
     'High Risk Churn': 'उच्च जोखिम ग्राहक',
@@ -123,6 +235,11 @@ const TRANSLATIONS = {
     'AI Retention Accuracy': 'एआई रिटेंशन सटीकता',
     'Churn Probability': 'छोड़ने की संभावना',
     'Retention Action': 'रिटेंशन कार्रवाई',
+    'Send Winback Offer': 'विशेष ऑफर भेजें',
+    'Schedule Executive Call': 'कॉल शेड्यूल करें',
+    'Predicted Risk Level': 'पूर्वानुमानित जोखिम स्तर',
+    'Last Order Date': 'अंतिम ऑर्डर तारीख',
+    'Customer Lifetime Value': 'ग्राहक का कुल मूल्य (LTV)',
 
     // Safeguards & Anomalies
     'Business Safeguards & Fraud Protection': 'व्यापार सुरक्षा एवं धोखाधड़ी रोकथाम',
@@ -132,22 +249,69 @@ const TRANSLATIONS = {
     'Warning Anomalies': 'चेतावनी अलर्ट',
     'Unresolved Incidents': 'अनिर्णीत घटनाएं',
     'Detection Sensitivity': 'पहचान संवेदनशीलता',
+    'Strict (2% Contamination)': 'सख्त (2% संवेदनशीलता)',
+    'Balanced (5% Contamination)': 'संतुलित (5% संवेदनशीलता)',
+    'High (10% Contamination)': 'उच्च (10% संवेदनशीलता)',
     'Anomaly Type': 'विसंगति प्रकार',
     'Severity': 'गंभीरता',
+    'Critical': 'गंभीर (Critical)',
+    'Warning': 'चेतावनी (Warning)',
+    'Info': 'सूचना (Info)',
+    'Acknowledge': 'स्वीकार करें',
+    'Investigate': 'जांच करें',
+    'Resolve Incident': 'समस्या हल करें',
+    'Incident Description': 'घटना विवरण',
+    'Anomaly Sensitivity Guide': 'विसंगति संवेदनशीलता मार्गदर्शिका',
 
-    // Business Setup & Settings
+    // Business Setup & AI Training
     'Workspace Business Profile': 'वर्कस्पेस बिजनेस प्रोफ़ाइल',
+    'Configure store identity, statutory GST rules, inventory parameters, and train AI models': 'स्टोर पहचान, जीएसटी नियम, इन्वेंटरी पैरामीटर और एआई मॉडल कॉन्फ़िगर करें',
     'Train & Refresh AI Models': 'एआई मॉडल प्रशिक्षित एवं रीफ्रेश करें',
+    'Training Models...': 'मॉडल प्रशिक्षित हो रहे हैं...',
     'Upload Logo / Photo': 'लोगो / फोटो अपलोड करें',
     'Save Configuration': 'कॉन्फ़िगरेशन सहेजें',
     'Business Name': 'व्यापार का नाम',
+    'Legal Business Name': 'वैधानिक व्यापार नाम',
     'Store Name': 'स्टोर का नाम',
     'Currency': 'मुद्रा',
     'Timezone': 'समय क्षेत्र',
-    'Profile Settings': 'प्रोफ़ाइल सेटिंग्स',
-    'Team Members': 'टीम सदस्य',
+    'Default Tax Rate (%)': 'डिफ़ॉल्ट टैक्स दर (%)',
+    'GST Identification Number (GSTIN)': 'जीएसटी पहचान संख्या (GSTIN)',
+    'Business Address': 'व्यापार का पता',
+    'Support Email': 'सपोर्ट ईमेल',
+    'Support Phone': 'सपोर्ट फोन',
+    'AI Model Calibration Summary': 'एआई मॉडल कैलिब्रेशन सारांश',
+    'All AI models calibrated successfully against your enterprise sales ledger.': 'सभी एआई मॉडल आपके बिक्री बहीखाते के आधार पर सफलतापूर्वक प्रशिक्षित हो गए हैं।',
 
-    // Common Buttons & Actions
+    // Team & Performance
+    'Team & Employee Performance Hub': 'टीम एवं कर्मचारी प्रदर्शन केंद्र',
+    'Monitor sales representatives, store managers, revenue targets, and activity audit trails': 'सेल्स टीम, स्टोर मैनेजर्स, बिक्री लक्ष्य और गतिविधि ऑडिट विवरण ट्रैक करें',
+    'Add Team Member': 'नया टीम सदस्य जोड़ें',
+    'Total Team Members': 'कुल टीम सदस्य',
+    'Active Staff Reps': 'सक्रिय कर्मचारी',
+    'Team Target Attainment': 'टीम लक्ष्य प्राप्ति',
+    'Top Performing Rep': 'सर्वश्रेष्ठ प्रदर्शनकर्ता',
+    'Full Name': 'पूरा नाम',
+    'Role & Title': 'पद एवं भूमिका',
+    'Assigned Store': 'निर्धारित स्टोर शाखा',
+    'Monthly Target': 'मासिक लक्ष्य',
+    'Total Sales': 'कुल बिक्री',
+    'View 60-Day Activity Trail': '60-दिवसीय गतिविधि इतिहास देखें',
+
+    // Reports & Forecasts
+    'Predictive Sales Reports & Demand Forecasts': 'बिक्री रिपोर्ट एवं मांग पूर्वानुमान',
+    'Multi-horizon AI forecasting for enterprise revenue, category growth, and inventory demand': 'राजस्व, श्रेणी वृद्धि और इन्वेंटरी मांग के लिए बहु-अवधि एआई पूर्वानुमान',
+    'Forecast Horizon': 'पूर्वानुमान अवधि',
+    '7 Days': '7 दिन',
+    '14 Days': '14 दिन',
+    '30 Days': '30 दिन',
+    'Export Executive Report': 'कार्यकारी रिपोर्ट डाउनलोड करें',
+    'Forecast Accuracy Score': 'पूर्वानुमान सटीकता स्कोर',
+    'Expected Revenue (Next Horizon)': 'अपेक्षित राजस्व (अगली अवधि)',
+    'Historical vs Forecast Trend': 'ऐतिहासिक बनाम पूर्वानुमान रुझान',
+    'SKU Demand Predictions': 'उत्पाद (SKU) मांग पूर्वानुमान',
+
+    // Common Buttons, Modals & Filters
     'Search': 'खोजें',
     'Filter': 'फ़िल्टर',
     'Export CSV': 'सीएसवी निर्यात करें',
@@ -166,14 +330,32 @@ const TRANSLATIONS = {
     'Date': 'तारीख',
     'Amount': 'राशि',
     'Invoice': 'इनवॉइस',
+    'Details': 'विवरण',
+    'Back': 'वापस',
+    'Next': 'आगे',
+    'Submit': 'जमा करें',
+    'Save': 'सहेजें',
+    'Success': 'सफल',
+    'Error': 'त्रुटि',
+    'Loading...': 'लोड हो रहा है...',
+    'Try Again': 'पुनः प्रयास करें',
+    'Reload Page': 'पेज रीलोड करें',
 
-    // Date Filters
+    // Time Horizons
     'Today': 'आज',
     'Yesterday': 'कल',
+    'This Week (Last 7 Days)': 'इस सप्ताह (पिछले 7 दिन)',
+    'This Month (Last 30 Days)': 'इस महीने (पिछले 30 दिन)',
     'Last 7 Days': 'पिछले 7 दिन',
     'Last 30 Days': 'पिछले 30 दिन',
+    'Last 6 Months': 'पिछले 6 महीने',
     'Last 6 Months (180 Days)': 'पिछले 6 महीने (180 दिन)',
-    'Custom Period': 'कस्टम अवधि'
+    '6 Months': '6 महीने',
+    'All Time': 'सभी समय',
+    'Custom Date Range': 'कस्टम तिथि सीमा',
+    'Custom Period': 'कस्टम अवधि',
+    'Start Date': 'प्रारंभ तिथि',
+    'End Date': 'समाप्ति तिथि'
   }
 };
 
@@ -188,14 +370,16 @@ export const LanguageProvider = ({ children }) => {
 
   const t = (text, fallback) => {
     if (!text) return text;
-    if (language === 'hi' && TRANSLATIONS.hi[text]) {
-      return TRANSLATIONS.hi[text];
+    if (typeof text !== 'string') return text;
+    const trimmed = text.trim();
+    if (language === 'hi' && TRANSLATIONS.hi[trimmed]) {
+      return TRANSLATIONS.hi[trimmed];
     }
     return fallback || text;
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, isHindi: language === 'hi' }}>
       {children}
     </LanguageContext.Provider>
   );
@@ -204,7 +388,7 @@ export const LanguageProvider = ({ children }) => {
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
   if (!context) {
-    return { language: 'en', setLanguage: () => {}, t: (str) => str };
+    return { language: 'en', setLanguage: () => {}, t: (str) => str, isHindi: false };
   }
   return context;
 };

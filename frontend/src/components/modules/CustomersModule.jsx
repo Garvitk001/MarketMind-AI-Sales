@@ -23,6 +23,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription } from '../ui/Card';
@@ -46,6 +47,7 @@ const csvValue = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
 export const CustomersModule = () => {
   const { api, access, currentRole } = useAuth();
   const { addToast } = useToast();
+  const { t } = useLanguage();
   const { customerSegmentSummary: summary, isLoading: sharedLoading, refresh } = useData();
   const segmentAccess = (access?.modules || []).find((module) => module.code === 'customer_segments');
   const canSegmentList = segmentAccess?.access !== 'summary';
@@ -320,21 +322,21 @@ export const CustomersModule = () => {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-              Commercial Client Directory
+              {t('Commercial Client Directory', 'Commercial Client Directory')}
             </span>
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
             <Users className="w-6 h-6 text-indigo-400" />
-            <span>Customer Accounts & B2B Credit Ledger</span>
+            <span>{t('B2B Customer Directory')}</span>
           </h2>
           <p className="text-xs text-slate-300 font-medium">
-            Manage retailer client accounts, GSTIN verification, credit limits, and payment collections
+            {t('Manage enterprise client accounts, credit limits, outstanding balances, and GSTIN details')}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Button variant="outline" size="sm" icon={Download} onClick={exportCsv} disabled={!items.length}>
-            Export Credit Ledger
+            {t('Export CSV')}
           </Button>
           <Button
             variant="primary"
@@ -343,10 +345,10 @@ export const CustomersModule = () => {
             onClick={() => setIsAddModalOpen(true)}
             className="shadow-lg shadow-indigo-600/30"
           >
-            Register B2B Client
+            {t('Add New Client')}
           </Button>
           <Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => refresh()} disabled={sharedLoading || loading}>
-            Refresh
+            {t('Refresh')}
           </Button>
         </div>
       </div>
@@ -355,20 +357,20 @@ export const CustomersModule = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card hoverEffect className="bg-gradient-to-br from-indigo-950/40 to-slate-900/60 border-indigo-500/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-slate-400">Total B2B Accounts</span>
+            <span className="text-xs font-semibold uppercase text-slate-400">{t('Total Clients')}</span>
             <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
               <Building2 className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-bold text-indigo-400">{customerKpis.totalAccounts} Clients</h3>
+            <h3 className="text-2xl font-bold text-indigo-400">{customerKpis.totalAccounts} {t('Active Customers')}</h3>
             <p className="text-[10px] text-slate-400 mt-1">Authorized wholesale & retail accounts</p>
           </div>
         </Card>
 
         <Card hoverEffect className="bg-gradient-to-br from-amber-950/40 to-slate-900/60 border-amber-500/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-slate-400">Total Outstanding Credit</span>
+            <span className="text-xs font-semibold uppercase text-slate-400">{t('Outstanding Credit')}</span>
             <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
               <Wallet className="w-5 h-5" />
             </div>
@@ -381,7 +383,7 @@ export const CustomersModule = () => {
 
         <Card hoverEffect className="bg-gradient-to-br from-rose-950/40 to-slate-900/60 border-rose-500/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-slate-400">High Credit Risk Accounts</span>
+            <span className="text-xs font-semibold uppercase text-slate-400">{t('High Risk Churn')}</span>
             <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400">
               <ShieldAlert className="w-5 h-5" />
             </div>
@@ -394,7 +396,7 @@ export const CustomersModule = () => {
 
         <Card hoverEffect className="bg-gradient-to-br from-emerald-950/40 to-slate-900/60 border-emerald-500/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-slate-400">Top Revenue Account</span>
+            <span className="text-xs font-semibold uppercase text-slate-400">{t('Top Revenue Account', 'Top Revenue Account')}</span>
             <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
               <TrendingUp className="w-5 h-5" />
             </div>

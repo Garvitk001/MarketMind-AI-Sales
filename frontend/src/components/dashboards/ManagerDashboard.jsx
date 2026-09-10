@@ -8,6 +8,7 @@ import { Input } from '../ui/Input';
 import { useToast } from '../../context/ToastContext';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   AlertTriangle,
   Boxes,
@@ -87,6 +88,7 @@ const getRecommendedReorderQty = (item) => {
 export const ManagerDashboard = () => {
   const { profile, api } = useAuth();
   const { addToast } = useToast();
+  const { t } = useLanguage();
   const { inventorySummary, inventoryItems: liveInventoryItems, refresh, purchaseOrders = [], createPurchaseOrder, deletePurchaseOrder } = useData();
 
   const [stores, setStores] = useState([]);
@@ -559,14 +561,14 @@ export const ManagerDashboard = () => {
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-200 mb-1 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Store Operations &amp; Inventory Telemetry</span>
+            <span>{t('Store Operations & Inventory Telemetry')}</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
             <Store className="w-6 h-6 text-indigo-400" />
-            <span>Store Manager Operations Hub</span>
+            <span>{t('Store Manager Operations Dashboard')}</span>
           </h1>
           <p className="text-sm text-indigo-200">
-            Manage live warehouse inventory, batch expiry dates, HSN compliance, stock movement receipts, and automated supplier Purchase Orders.
+            {t('Manage live warehouse inventory, batch expiry dates, HSN compliance, stock movement receipts, and automated supplier Purchase Orders.')}
           </p>
         </div>
 
@@ -578,7 +580,7 @@ export const ManagerDashboard = () => {
             onClick={exportStockRegisterCsv}
             className="bg-white/10 hover:bg-white/20 text-white border-white/20"
           >
-            Export Stock (CSV)
+            {t('Export Stock (CSV)')}
           </Button>
           <Button
             variant="outline"
@@ -587,7 +589,7 @@ export const ManagerDashboard = () => {
             onClick={() => handleOpenPoModal(null)}
             className="bg-white/10 hover:bg-white/20 text-white border-white/20"
           >
-            PO Request
+            {t('Raise PO Request')}
           </Button>
           <Button
             variant="primary"
@@ -596,7 +598,7 @@ export const ManagerDashboard = () => {
             onClick={() => setIsAddProductOpen(true)}
             className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg font-bold"
           >
-            Add Product
+            {t('Add New Product')}
           </Button>
         </div>
       </div>
@@ -605,7 +607,7 @@ export const ManagerDashboard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card hoverEffect={false} className="border-l-4 border-l-indigo-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Store Stock Valuation</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('Total Store Stock Valuation')}</span>
             <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40">
               <TrendingUp className="w-4 h-4" />
             </div>
@@ -614,39 +616,39 @@ export const ManagerDashboard = () => {
             <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
               ₹{stockKpis.totalAssetValuation.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{stockKpis.totalUnits.toLocaleString('en-IN')} physical units across {stockKpis.totalSkus} SKUs</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{stockKpis.totalUnits.toLocaleString('en-IN')} units · {stockKpis.totalSkus} SKUs</p>
           </div>
         </Card>
 
         <Card hoverEffect={false} className="border-l-4 border-l-blue-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active Warehouse SKUs</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('Total Active SKUs')}</span>
             <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40">
               <Boxes className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2">
-            <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stockKpis.totalSkus} Active SKUs</h3>
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stockKpis.totalSkus} {t('Stock Units')}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{stockKpis.totalUnits.toLocaleString('en-IN')} total units in warehouse</p>
           </div>
         </Card>
 
         <Card hoverEffect={false} className="border-l-4 border-l-amber-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Low-Stock Alert Queue</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('Low Stock Alert Queue')}</span>
             <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2">
-            <h3 className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stockKpis.lowStockCount} SKUs Depleted</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Below minimum safety reorder threshold</p>
+            <h3 className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stockKpis.lowStockCount} {t('Low Stock')}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('Below minimum safety reorder threshold')}</p>
           </div>
         </Card>
 
         <Card hoverEffect={false} className="border-l-4 border-l-rose-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Expiring Stock (&lt; 90 Days)</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('Expiring Stock (< 90 Days)')}</span>
             <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40">
               <Clock className="w-4 h-4" />
             </div>
@@ -665,11 +667,11 @@ export const ManagerDashboard = () => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-indigo-500" />
-                <span>Store Sales Team &amp; Target Telemetry</span>
+                <span>{t('Store Sales Team & Target Telemetry')}</span>
               </CardTitle>
-              <CardDescription>Live sales performance and target progress for sales executives assigned to your store</CardDescription>
+              <CardDescription>{t('Live sales performance and target progress for sales executives assigned to your store')}</CardDescription>
             </div>
-            <Badge variant="info">Store Operations</Badge>
+            <Badge variant="info">{t('Store Operations')}</Badge>
           </div>
         </CardHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
@@ -863,8 +865,8 @@ export const ManagerDashboard = () => {
         <CardHeader>
           <div className="flex flex-col lg:flex-row lg:items-center justify-between w-full gap-4">
             <div>
-              <CardTitle>Real-Time Store Inventory Register</CardTitle>
-              <CardDescription>Live warehouse stock balances, batch telemetry, and unit valuations</CardDescription>
+              <CardTitle>{t('Real-Time Stock Inventory')}</CardTitle>
+              <CardDescription>{t('Live warehouse stock balances, batch telemetry, and unit valuations')}</CardDescription>
             </div>
 
             {/* Filter Controls Bar */}
@@ -963,13 +965,13 @@ export const ManagerDashboard = () => {
           <table className="w-full text-left text-xs">
             <thead className="uppercase text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="p-3">SKU / HSN Code</th>
-                <th className="p-3">Product Name &amp; Pack Size</th>
-                <th className="p-3">Batch Number &amp; Expiry</th>
-                <th className="p-3">Stock Level &amp; Safety</th>
-                <th className="p-3">Unit Rate &amp; Valuation</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 text-right">Actions</th>
+                <th className="p-3">{t('SKU / HSN Code', 'SKU / HSN Code')}</th>
+                <th className="p-3">{t('Product Name & Pack Size', 'Product Name & Pack Size')}</th>
+                <th className="p-3">{t('Batch Number & Expiry', 'Batch Number & Expiry')}</th>
+                <th className="p-3">{t('Stock Level & Safety', 'Stock Level & Safety')}</th>
+                <th className="p-3">{t('Unit Rate & Valuation', 'Unit Rate & Valuation')}</th>
+                <th className="p-3">{t('Status')}</th>
+                <th className="p-3 text-right">{t('Actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -996,7 +998,7 @@ export const ManagerDashboard = () => {
                     </td>
                     <td className="p-3">
                       <div className="font-bold text-slate-900 dark:text-slate-100">{item.stock} Units</div>
-                      <div className="text-[11px] text-slate-400">Reorder Min: {item.minStock}</div>
+                      <div className="text-[11px] text-slate-400">{t('Reorder Level')}: {item.minStock}</div>
                     </td>
                     <td className="p-3">
                       <div className="font-semibold text-slate-900 dark:text-slate-100">₹{item.unitPriceNum.toLocaleString('en-IN')}</div>
@@ -1014,7 +1016,7 @@ export const ManagerDashboard = () => {
                             : 'danger'
                         }
                       >
-                        {stockStatus === 'in_stock' ? 'In Stock' : stockStatus === 'low_stock' ? 'Low Stock' : 'Out of Stock'}
+                        {stockStatus === 'in_stock' ? t('In Stock') : stockStatus === 'low_stock' ? t('Low Stock') : t('Out of Stock')}
                       </Badge>
                     </td>
                     <td className="p-3 text-right">
@@ -1115,12 +1117,12 @@ export const ManagerDashboard = () => {
               <tr>
                 <th className="p-3">PO Number &amp; Date</th>
                 <th className="p-3">Product / SKU</th>
-                <th className="p-3">Quantity &amp; Unit Rate</th>
-                <th className="p-3">Wholesale Supplier</th>
-                <th className="p-3">Total Estimated Amount</th>
-                <th className="p-3">Approval Status</th>
-                <th className="p-3">Owner Remarks / Notes</th>
-                <th className="p-3 text-right">Actions</th>
+                <th className="p-3">{t('Quantity & Rate')}</th>
+                <th className="p-3">{t('Supplier')}</th>
+                <th className="p-3">{t('Order Valuation')}</th>
+                <th className="p-3">{t('Approval Status')}</th>
+                <th className="p-3">{t('Owner Authorization Remarks', 'Owner Remarks / Notes')}</th>
+                <th className="p-3 text-right">{t('Actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -1153,19 +1155,19 @@ export const ManagerDashboard = () => {
                     {po.status === 'pending_owner_approval' && (
                       <Badge variant="warning" className="inline-flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        <span>Pending Owner Approval</span>
+                        <span>{t('Pending Owner Approval')}</span>
                       </Badge>
                     )}
                     {po.status === 'approved' && (
                       <Badge variant="success" className="inline-flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" />
-                        <span>Approved &amp; Dispatched</span>
+                        <span>{t('Approved & Dispatched')}</span>
                       </Badge>
                     )}
                     {po.status === 'rejected' && (
                       <Badge variant="danger" className="inline-flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" />
-                        <span>Rejected by Owner</span>
+                        <span>{t('Rejected by Owner')}</span>
                       </Badge>
                     )}
                   </td>
@@ -1186,9 +1188,9 @@ export const ManagerDashboard = () => {
                         icon={Mail}
                         onClick={() => handleDispatchPoEmail(po)}
                         className="text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
-                        title="Dispatch PO via Email"
+                        title={t('Email Supplier')}
                       >
-                        Email
+                        {t('Email Supplier')}
                       </Button>
                       <Button
                         variant="ghost"
@@ -1196,7 +1198,7 @@ export const ManagerDashboard = () => {
                         icon={Download}
                         onClick={() => downloadPoFile(po)}
                         className="text-xs"
-                        title="Download Purchase Order CSV"
+                        title={t('Export PO')}
                       >
                         CSV
                       </Button>
@@ -1219,7 +1221,7 @@ export const ManagerDashboard = () => {
                           }}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
                         >
-                          Receive Stock
+                          {t('Receive Stock')}
                         </Button>
                       )}
                       {po.status === 'pending_owner_approval' && (
@@ -1232,9 +1234,9 @@ export const ManagerDashboard = () => {
                             addToast(`Purchase Order ${po.id} cancelled.`, 'info');
                           }}
                           className="text-rose-500 hover:text-rose-600 text-xs"
-                          title="Cancel PO Request"
+                          title={t('Cancel')}
                         >
-                          Cancel
+                          {t('Cancel')}
                         </Button>
                       )}
                     </div>

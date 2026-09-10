@@ -5,6 +5,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useToast } from '../../context/ToastContext';
 import { useData } from '../../context/DataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { DateRangeFilter } from '../common/DateRangeFilter';
 import {
   Target,
@@ -39,6 +40,7 @@ import {
 export const SalesDashboard = ({ onNavigate }) => {
   const { addToast } = useToast();
   const { salesDashboard, inventoryItems, salesTransactions, customers } = useData();
+  const { t } = useLanguage();
 
   const money = (value) =>
     `₹${Number(value || 0).toLocaleString('en-IN', {
@@ -202,14 +204,14 @@ export const SalesDashboard = ({ onNavigate }) => {
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-200 mb-1 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30">
             <Award className="w-3.5 h-3.5" />
-            <span>Sales Executive Command Hub</span>
+            <span>{t('Sales Executive Command Hub', 'Sales Executive Command Hub')}</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
             <ShoppingBag className="w-6 h-6 text-indigo-400" />
-            <span>Personal Sales Target &amp; Deal Workspace</span>
+            <span>{t('Sales Executive Dashboard')}</span>
           </h1>
           <p className="text-sm text-indigo-200">
-            Track daily sales revenue, target completion %, active B2B account deals, and AI cross-sell recommendations.
+            {t('Personal sales pipeline tracking, daily customer transactions, quota pace indicators, target progress, and B2B customer relationship management.')}
           </p>
         </div>
 
@@ -221,7 +223,7 @@ export const SalesDashboard = ({ onNavigate }) => {
             onClick={() => onNavigate('recommendations')}
             className="bg-white/10 hover:bg-white/20 text-white border-white/20"
           >
-            AI Cross-Sell Hub
+            {t('AI Recommender')}
           </Button>
           <Button
             variant="primary"
@@ -229,7 +231,7 @@ export const SalesDashboard = ({ onNavigate }) => {
             icon={PlusCircle}
             onClick={() => onNavigate('sales')}
           >
-            New Tax Invoice
+            {t('New B2B Invoice')}
           </Button>
         </div>
       </div>
@@ -275,7 +277,7 @@ export const SalesDashboard = ({ onNavigate }) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card hoverEffect={false} className="border-l-4 border-l-indigo-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sales Revenue</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('Total Revenue')}</span>
             <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40">
               <Target className="w-4 h-4" />
             </div>
@@ -288,7 +290,7 @@ export const SalesDashboard = ({ onNavigate }) => {
 
         <Card hoverEffect={false} className="border-l-4 border-l-emerald-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Completed Orders</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('Orders Closed')}</span>
             <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
               <CheckCircle2 className="w-4 h-4" />
             </div>
@@ -301,7 +303,7 @@ export const SalesDashboard = ({ onNavigate }) => {
 
         <Card hoverEffect={false} className="border-l-4 border-l-blue-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Average Order Value</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('Average Order Value')}</span>
             <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40">
               <Layers className="w-4 h-4" />
             </div>
@@ -314,7 +316,7 @@ export const SalesDashboard = ({ onNavigate }) => {
 
         <Card hoverEffect={false} className="border-l-4 border-l-violet-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Items Sold</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('Items / Volume')}</span>
             <div className="p-2 rounded-xl bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800/40">
               <TrendingUp className="w-4 h-4" />
             </div>
