@@ -6,7 +6,7 @@
 [![React Version](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://react.dev)
 [![Vyapar AI](https://img.shields.io/badge/India%20First-Vyapar%20Sales%20AI-F59E0B?style=for-the-badge)](https://marketmind-ai-sales.vercel.app)
 
-> **MarketMind AI (v2.6)** is a full-stack, enterprise-grade AI sales intelligence, customer retention, inventory management, multi-horizon demand forecasting, employee activity audit, and conversational business copilot platform engineered specifically for Indian retail, wholesale, and small-to-medium enterprises (MSMEs).
+> **MarketMind AI (v2.7)** is a full-stack, enterprise-grade AI sales intelligence, customer retention, multi-store inventory procurement, demand forecasting, employee activity audit, and conversational business copilot platform engineered specifically for Indian retail, wholesale, and small-to-medium enterprises (MSMEs).
 
 ---
 
@@ -21,14 +21,15 @@
 ## 👤 About the Project & Developer
 - **Project**: MarketMind AI — Indian Small Business Sales Intelligence & AI Vyapar Copilot
 - **Author**: Garvit ([@Garvitk001](https://github.com/Garvitk001))
-- **Live Frontend App**: [https://marketmind-ai-sales.vercel.app](https://marketmind-ai-sales.vercel.app)
-- **Repository**: [Team_1_Small_Biz_Sales_AI](https://github.com/springboardmentor24052s-tech/Team_1_Small_Biz_Sales_AI)
+- **Personal Repository**: [MarketMind-AI-Sales](https://github.com/Garvitk001/MarketMind-AI-Sales)
+- **Team Repository**: [Team_1_Small_Biz_Sales_AI](https://github.com/springboardmentor24052s-tech/Team_1_Small_Biz_Sales_AI)
 
 ---
 
-## 🎨 Authentic Indian Small Business (Vyapar) Identity
-MarketMind AI features an authentic, custom-designed logo and branding rooted in the Indian retail ecosystem:
-- **Dukaan Awning & Arch Silhouette**: Symbolizes traditional storefronts and commercial trust.
+## 🎨 Authentic Indian Small Business (Vyapar) Identity & Modern Design
+MarketMind AI features an authentic, custom-designed logo and high-end visual design system rooted in the Indian retail ecosystem:
+- **Modern Typography**: High-grade geometric typography powered by `Plus Jakarta Sans` for clean data readability and `Outfit` for bold commercial headings and brand elements.
+- **Dukaan Awning & Arch Silhouette**: Symbolizes traditional storefronts, merchant resilience, and commercial trust.
 - **Indian Rupee (`₹`) Symbol Integration**: Embeds native Indian currency and commercial vitality into the core emblem.
 - **Ascending Sales Momentum Wave**: Represents sustainable business growth, accurate AI forecasting, and operational clarity.
 - **Warm Saffron, Gold & Royal Indigo Palette**: Conveys prosperity, stability, and modern technological capability.
@@ -38,91 +39,67 @@ MarketMind AI features an authentic, custom-designed logo and branding rooted in
 ## 🌟 Key Platform Features
 
 ### 🏢 1. Role-Aware Operational Workspaces & Dashboards
-- **Business Owner Workspace**: Executive KPI monitoring, dynamic revenue trends, profit margins, active customer counts, average order value (AOV), sales distribution, team telemetry, and strategic AI growth insights.
-- **Store Manager Workspace**: Real-time store inventory tracking, manual product CRUD (Add, Edit, Delete), low-stock threshold triggers, automated supplier purchase order generation, and POS terminal management.
-- **Sales Executive Workspace**: Personal sales pipeline tracking, daily customer transactions, quota pace indicators, target progress, and customer relationship management.
+- **Business Owner Workspace**: Executive KPI monitoring, dynamic revenue trends, profit margins, active customer counts, average order value (AOV), sales distribution, team telemetry, purchase order authorization hub, and strategic AI growth insights.
+- **Store Manager Workspace**: Real-time store inventory tracking, branch filtering, manual product CRUD (Add, Edit, Delete), low-stock safety triggers, 2-step purchase order drafting, and supplier email dispatching.
+- **Sales Executive Workspace**: Personal sales pipeline tracking, daily customer transactions, quota pace indicators, target progress, and B2B customer relationship management.
 - **Platform Administrator Console**: Full governance center with live multi-tenant business directories, authentication/login audit stream, AI model retrain schedules, and real-time error diagnostics.
 
-### 🛡️ 2. Platform Admin Console: Dynamic Tenant & Employee Governance
-- **Multi-Tenant Business Directory**: Real-time directory querying all registered businesses, store locations, business owners (with names, verified emails, and phone numbers), and full employee rosters.
-- **Comprehensive Authentication & Login Stream (`auth_logs`)**: Live audit trail logging every user login, logout, session activity, OTP validation, and role modification with:
-  - Precise timestamp & date
-  - User name and post/role (Business Owner, Store Manager, Sales Executive, Admin)
-  - Registered email address
-  - Contact phone number
-  - Affiliated business name
-  - Authentication event method & severity status badge
-- **Dynamic Business Filters**: Instant filtering of audit logs and AI retraining schedules across all registered businesses or specific workspaces.
+### 📋 2. 2-Step Purchase Order (PO) Procurement & Approval Workflow
+- **Store Manager PO Drafting**: Store Managers can identify low-stock items and raise formal PO requests specifying suggested quantities, estimated unit costs, and justification notes.
+- **Owner Decision Hub**:
+  - **Quick Approve**: Authorizes the PO with one click, transitioning status to `Approved & Dispatched`.
+  - **Edit & Approve**: Owners can calibrate quantities (e.g. reduce due to budget limits), adjust negotiated unit rates, update suppliers, and attach feedback remarks before authorization.
+  - **Reject with Guidance**: Declines unviable requests with mandatory constructive guidance notes for the store manager.
+- **PO Dispatch & Supplier Emailing**: Instant CSV export of commercial purchase orders and integrated `mailto:` supplier email dispatching.
 
-### ✉️ 3. Mandatory & Blocking Email Verification via OTP
-- **First-Time Dashboard Gate**: When a Business Owner or any team member logs into their dashboard with an unverified email (`email_verified === false`), a mandatory blocking modal overlay automatically prevents background access until verified.
-- **6-Digit OTP Dispatch**: Integrated with Resend API and SMTP dispatchers to send a secure 6-digit one-time password to the user's registered inbox.
-- **Instant Workspace Unlock**: Entering the valid OTP verifies the account, records an audit event, updates security tokens, and unlocks full dashboard capabilities.
+### 🌐 3. Comprehensive Multilingual Engine (English & हिन्दी)
+- **Complete Dashboard Localization**: 150+ dictionary keys covering metric cards, navigation items, table columns, action buttons, payment methods, order statuses, and time filters.
+- **Persistent Language Preference**: Seamless real-time switching between English and Hindi (`हिन्दी`) with automatic state persistence.
 
-### ⏱️ 4. Individual Sales Executive Telemetry & Timeframe Analysis
-- **Configurable Time Horizons**: Business Owners can analyze individual sales executive performance across **Today**, **Yesterday**, **7 Days**, **30 Days**, and **6 Months**.
-- **Real-Time Staff Telemetry**: Period revenue, closed invoices, units sold, average ticket size (AOV), target progress bars, and growth comparisons.
-- **Dual View Modes**: Interactive Grid Cards view and comparison Table view.
+### 🛡️ 4. Dynamic Role Onboarding & Email Conflict Protection
+- **Role-Specific Onboarding**: Dynamic registration headers tailored to *Business Owner*, *Store Manager*, or *Sales Executive* with visible role selection badges.
+- **Cross-Role Collision Detection**: Proactively detects existing credentials across roles and alerts users with clear guidance rather than failing silently or causing unexpected role escalation.
+- **Mandatory Email OTP Verification**: 6-digit one-time password verification triggered via Resend API / SMTP before account access is granted.
 
-### 🔍 5. 60-Day Employee Task & Activity Audit Trail
-- **Comprehensive History**: When the Business Owner clicks **"Inspect History"** or **"Analyse"** on any Store Manager or Sales Executive, the system surfaces a 60-day chronological action audit log.
-- **Tracked Staff Actions**:
-  - **Sales Executives**: Invoices generated, paid bills, unpaid/credit orders, payment status changes ("Mark as Paid").
-  - **Store Managers**: Products added, catalog edits, product deletions, inventory stock adjustments.
-  - **Security & Authentication**: Staff login sessions, role/store assignments, and revenue target updates.
-- **Instant Category Filtering**: Filter audit trails by *All Tasks*, *Billing & Payments*, *Inventory & Stock*, and *Logins & Auth*.
+### 💳 5. Flexible Sales & Payment Method Filtering
+- **Multi-Rail Payment Filtering**: Case-insensitive and alias matching for Indian payment methods:
+  - **UPI / QR Code**
+  - **Cash on Delivery (COD)**
+  - **Bank Transfer / NEFT / RTGS**
+  - **Credit Ledger / Udhar Khata**
+- **Credit Receivables Aging (7-Day & 15-Day Limits)**: Automated tracking of current (0–7 days), due soon (8–15 days), and overdue (15+ days) credit accounts.
 
-### 💳 6. Credit Receivables Aging (7-Day & 15-Day Limits)
-- **Structured Aging Buckets**:
-  - **`0–7 Days`**: Current credit terms.
-  - **`8–15 Days`**: Due soon / payment reminder window.
-  - **`15+ Days (Overdue)`**: Overdue receivables requiring automated collection follow-up.
-- **Real-Time Payment Visibility**: When a Store Manager or Sales Executive updates or marks a bill as paid, the changes reflect immediately in the Owner's credit ledger and dashboard.
+### 👥 6. B2B Client Directory & Deep Search Persistence
+- **Comprehensive Multi-Field Search**: Searches across Company Name, Contact Name, Email, Phone Number, GSTIN, and Customer ID.
+- **Immediate State Consistency**: Newly created B2B clients persist in search results with real-time customer count synchronization.
 
-### 🤖 7. Interactive AI Business Copilot
-- **Conversational Assistant**: Domain personas (Executive Strategist, Inventory & Operations Optimizer, Customer Retention Specialist, and Data Analyst).
-- **Context-Aware Insights**: Responds with actionable business suggestions, cross-sell ideas, replenishment strategies, and financial analysis.
-- **Bilingual Support**: Real-time language switching between **English** and **Hindi (`हिन्दी`)**.
+### 🛒 7. Dynamic AI Product Recommender Engine
+- **Dynamic Catalog Synchronization**: Recommendation categories and filters are populated dynamically from live catalog data, eliminating category mismatch bugs.
+- **Multi-Level Matching**: Supports customer lookup by UUID or external code with customizable recommendation limits (up to 20 products).
+- **Association Rule Mining & Collaborative Filtering**: High-confidence cross-sell and up-sell suggestions based on basket co-occurrence.
 
-### 🛒 8. AI Product Recommender Engine
-- **Collaborative & Association Rule Mining**: Generates high-confidence product affinity, cross-selling, and up-selling recommendations based on transaction co-occurrence.
-- **Customer-Specific Recommendations**: Dynamic recommendations tailored to individual customer purchasing history and affinity scores.
-- **Affinity Analytics & Revenue Uplift**: Actionable bundle suggestions with estimated revenue uplift and conversion potential.
-
-### 👥 9. Customer Retention & Churn Analytics (Customer 360)
-- **RFM Segmentation**: Multi-dimensional Recency, Frequency, and Monetary value clustering to classify customers into Champions, Loyal, At Risk, and Hibernating tiers.
-- **Predictive Churn Risk Scoring**: Identifies revenue-at-risk customers before churn occurs.
-- **Integrated Outreach Workflows**: One-click communication triggers via pre-formatted Email and WhatsApp templates.
-- **Customer 360 Profile**: Historical order timeline, favorite categories, lifetime value (LTV), and personalized re-engagement recommendations.
-
-### 🛡️ 10. Anomaly Detection & Business Safeguards
-- **Multi-Factor Anomaly Engine**: Detects unusual revenue drops, sudden transaction spikes, inventory discrepancies, and irregular discount patterns.
-- **Severity Filtering & Triage**: Categorizes anomalies by severity (`Critical`, `Warning`, `Info`) with sensitivity tuning.
+### 🛡️ 8. Anomaly Detection & Business Safeguards
+- **Multi-Factor Anomaly Engine**: Detects unusual revenue dips, transaction spikes, inventory discrepancies, and irregular discount patterns.
+- **Interactive Sensitivity Guide**: Transparent documentation explaining Isolation Forest contamination thresholds (*Strict 2%*, *Balanced 5%*, *High 10%*).
 - **Resolution Workflow**: Audit-logged acknowledge, investigate, and resolve workflow to track issue mitigation.
 
-### 📦 11. Inventory & Supplier Purchase Orders
-- **Automated Stock Level Monitoring**: Visual safety-stock thresholds and reorder triggers.
-- **Supplier PO Generator**: Generates formal purchase orders with supplier contact data, line-item quantities, and unit costs.
-- **Manual Product CRUD**: Direct addition, editing, and deletion of products and stock units.
-- **Export & Delivery**: Instant export to CSV and formatted printable documentation for supplier communication.
-
-### 📈 12. Predictive Forecasting & Analytics Reports
-- **Multi-Model Forecast Engine**: Powered by XGBoost, Prophet, and Linear Trend algorithms.
-- **Multi-Horizon Predictions**: Configurable forecast horizons (**7, 14, and 30 days**) for business revenue and SKU-level product demand.
-- **Model Health & Lineage**: Chronological train/validation splits, MAE/RMSE/R² metrics, and baseline improvement gates.
-- **Statutory Billing & GST Invoices**: Automated generation of GST-compliant A5 Wholesale Thermal and Laser invoices with CGST/SGST/IGST breakdowns.
-- **Executive CSV Export**: One-click download of revenue summaries, sales ledgers, and inventory reports.
+### 🔄 9. Model Training & Refresh Calibration Feedback
+- **Transparent Model Calibration**: Clicking **"Train & Refresh AI Models"** displays a detailed completion breakdown showing:
+  - **ARIMA & Prophet Demand Models**: Calibrated against SKU sales velocity and seasonality.
+  - **Collaborative Filtering Matrices**: Co-occurrence vectors updated with recent transactions.
+  - **RFM Customer Segmentation**: Tiers recalculated with updated Recency, Frequency, and Monetary scores.
+  - **Isolation Forest Thresholds**: Contamination boundaries refreshed to current sales distributions.
 
 ---
 
-## 🔒 Enterprise Security & Resilience
+## 🔒 Enterprise Security & Architecture
 
 - **Tenant Data Isolation**: Strict multi-tenant boundaries. New registrations start with clean, private workspaces while sample data is isolated to demo accounts.
 - **No Hardcoded Secrets**: All credentials, JWT secrets, database connection strings, and API keys are strictly configured via environment variables (`.env`) with typed Pydantic validation.
 - **Email OTP Verification & Resend API**: Real-time 6-digit OTP verification powered by Resend API and SMTP dispatchers for registration, first login, and password resets.
 - **Tiered Rate Limiting**: In-memory token bucket rate limiter protecting Authentication (`15 req/min`), Public (`60 req/min`), and Authenticated (`300 req/min`) routes with automated `Retry-After` headers.
 - **Zero-Leakage Error Handling**: Sanitized global exception handlers for database (`SQLAlchemyError`) and internal runtime errors with server-side correlation IDs preventing internal schema leakage.
-- **File Upload Protection**: Avatar image uploads verified using magic-byte file signature validation (`image/png`, `image/jpeg`, `image/webp`) with a 2MB size cap.
+- **File Upload Protection**: Avatar and logo uploads verified using magic-byte file signature validation (`image/png`, `image/jpeg`, `image/webp`) with direct base64/blob URL pass-through and a 2MB size cap.
 - **Modern Authentication & Authorization**: Argon2id password hashing, rotating JWT access and refresh sessions, and secure employee invitations.
 
 ---
@@ -153,7 +130,7 @@ Team_1_Small_Biz_Sales_AI/
 │   │   │   ├── common/       # MarketMindLogo, Navbar, Sidebar, EmailVerificationModal
 │   │   │   ├── dashboards/   # Owner, Manager, Sales, and Admin Dashboards
 │   │   │   └── modules/      # Sales, Inventory, Customers, Recommendations, Churn, Reports, Team
-│   │   ├── context/          # Auth, Language, Toast, and Theme contexts
+│   │   ├── context/          # Auth, Language, Toast, Data, and Theme contexts
 │   │   ├── services/         # Axios API clients with auto token refresh
 │   │   └── test/             # Frontend Vitest & React Testing Library test suites (31 tests)
 │   ├── public/               # Static assets & custom Indian Vyapar favicon.svg
@@ -180,8 +157,8 @@ Team_1_Small_Biz_Sales_AI/
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/springboardmentor24052s-tech/Team_1_Small_Biz_Sales_AI.git
-cd Team_1_Small_Biz_Sales_AI
+git clone https://github.com/Garvitk001/MarketMind-AI-Sales.git
+cd MarketMind-AI-Sales
 ```
 
 ---
@@ -311,6 +288,7 @@ npm run test:run
 ### Frontend
 - **Framework**: React 18 (Vite SPA)
 - **Styling**: Vanilla CSS & Tailwind CSS (Custom Indian-inspired theme tokens & dark mode)
+- **Typography**: Plus Jakarta Sans & Outfit (Google Fonts)
 - **Icons**: Lucide React & Custom Indian Vyapar SVG Vector Logos
 - **Data Visualization**: Recharts & Custom SVG metric cards
 - **Testing**: Vitest, React Testing Library, jsdom
@@ -331,4 +309,4 @@ npm run test:run
 
 ## 👥 Project Summary
 
-MarketMind AI combines predictive AI analytics, inventory control, automated GST invoicing, customer churn prevention, 60-day employee task audit trails, dynamic platform admin governance, mandatory email OTP protection, and an interactive business copilot into a unified, secure platform built for Indian small-to-medium retail and wholesale enterprises.
+MarketMind AI combines predictive AI analytics, 2-step purchase order procurement, automated GST invoicing, customer churn prevention, 60-day employee task audit trails, dynamic platform admin governance, mandatory email OTP protection, and an interactive bilingual business copilot into a unified, secure platform built for Indian small-to-medium retail and wholesale enterprises.
