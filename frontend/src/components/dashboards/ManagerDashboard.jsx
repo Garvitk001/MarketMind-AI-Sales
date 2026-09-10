@@ -32,6 +32,7 @@ import {
   PackagePlus,
   Sparkles,
   PieChart as PieIcon,
+  Send
 } from 'lucide-react';
 import {
   ResponsiveContainer,
