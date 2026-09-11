@@ -17,9 +17,12 @@ import {
   Trash2,
   UserRound,
   Sparkles,
-  UserCog,
   AlertTriangle,
   Lock,
+  Mail,
+  KeyRound,
+  AlertCircle,
+  XCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,6 +31,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardDescription, CardHeader, CardTitle } from '../ui/Card';
 import { Input } from '../ui/Input';
+import { Modal } from '../ui/Modal';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 
 const selectClass =
@@ -91,7 +95,7 @@ const formatDate = (value, format) => {
 };
 
 export const SettingsModule = ({ onNavigate }) => {
-  const { currentRole, profile, updateProfile, uploadAvatar, deleteAvatar, api, refreshProfile } = useAuth();
+  const { currentRole, profile, updateProfile, uploadAvatar, deleteAvatar, api, refreshProfile, logout } = useAuth();
   const { setThemePreference } = useTheme();
   const { addToast } = useToast();
   const fileInput = useRef(null);
@@ -103,6 +107,69 @@ export const SettingsModule = ({ onNavigate }) => {
   const [savedBizAt, setSavedBizAt] = useState(null);
   const [previewAvatar, setPreviewAvatar] = useState(null);
   const [uploading, setUploading] = useState(false);
+
+  // Business Deletion state
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteStep, setDeleteStep] = useState('initial'); // 'initial' | 'otp'
+  const [deleteOtp, setDeleteOtp] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [isRequestingDeleteOtp, setIsRequestingDeleteOtp] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [deleteCountdown, setDeleteCountdown] = useState(0);
+
+  useEffect(() => {
+    let timer;
+    if (deleteCountdown > 0) {
+      timer = setTimeout(() => setDeleteCountdown((prev) => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [deleteCountdown]);
+
+  const handleRequestDeleteOtp = async () => {
+    setIsRequestingDeleteOtp(true);
+    setDeleteError('');
+    try {
+      const res = await api('/users/me/business/request-delete-otp', { method: 'POST' });
+      setDeleteStep('otp');
+      setDeleteCountdown(30);
+      if (res?.token) {
+        setDeleteOtp(res.token);
+      }
+      addToast(res?.message || 'A 6-digit confirmation OTP has been emailed to you.', 'info');
+    } catch (err) {
+      setDeleteError(err.message || 'Unable to generate deletion OTP');
+      addToast(err.message, 'error');
+    } finally {
+      setIsRequestingDeleteOtp(false);
+    }
+  };
+
+  const handleConfirmDelete = async (e) => {
+    e?.preventDefault?.();
+    const cleanOtp = deleteOtp.trim();
+    if (cleanOtp.length !== 6) {
+      setDeleteError('Please enter a valid 6-digit OTP code');
+      return;
+    }
+    setIsConfirmingDelete(true);
+    setDeleteError('');
+    try {
+      const res = await api('/users/me/business/confirm-delete', {
+        method: 'POST',
+        body: JSON.stringify({ token: cleanOtp }),
+      });
+      addToast(res?.message || 'Business workspace scheduled for deletion. 15-day grace period started.', 'success');
+      setIsDeleteModalOpen(false);
+      setTimeout(() => {
+        logout?.();
+      }, 1200);
+    } catch (err) {
+      setDeleteError(err.message || 'Incorrect OTP code. Please check your email.');
+      addToast(err.message, 'error');
+    } finally {
+      setIsConfirmingDelete(false);
+    }
+  };
 
   const [bizForm, setBizForm] = useState({
     business_name: '',
@@ -516,6 +583,160 @@ export const SettingsModule = ({ onNavigate }) => {
           <Lock className="w-3.5 h-3.5 text-slate-400" /> Passwords are encrypted with bcrypt hashes. Use "Forgot password" on the sign-in page to reset credentials.
         </p>
       </Card>
+
+      {/* Danger Zone for Business Owner */}
+      {isOwner && (
+        <Card hoverEffect={false} className="border-rose-300/60 dark:border-rose-900/60 bg-rose-50/20 dark:bg-rose-950/10">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                  <AlertTriangle className="w-5 h-5 text-rose-500" />
+                  <span>Danger Zone: Delete Business &amp; Workspace</span>
+                </CardTitle>
+                <CardDescription>
+                  Permanently delete this business enterprise, all store locations, products, inventory, team members, and invoices.
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                variant="danger"
+                icon={Trash2}
+                onClick={() => {
+                  setDeleteStep('initial');
+                  setDeleteOtp('');
+                  setDeleteError('');
+                  setIsDeleteModalOpen(true);
+                }}
+                className="bg-rose-600 hover:bg-rose-700 text-white shrink-0"
+              >
+                Delete Business Account
+              </Button>
+            </div>
+          </CardHeader>
+          <div className="p-4 rounded-xl bg-white/60 dark:bg-slate-900/60 border border-rose-200 dark:border-rose-900/40 text-xs text-slate-600 dark:text-slate-300 space-y-1.5">
+            <p className="font-semibold text-rose-600 dark:text-rose-400">
+              🛡️ 15-Day Automatic Protection &amp; Grace Period Policy:
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-slate-500 dark:text-slate-400">
+              <li>When confirmed with your email OTP, the workspace will be suspended and all staff logins will be blocked.</li>
+              <li><strong>Auto-Restoration:</strong> If you log in again as the Business Owner within 15 days, your business will automatically be restored and reactivated without losing any data.</li>
+              <li>If you do not log in within 15 days, all data and history will be permanently and irreversibly purged.</li>
+            </ul>
+          </div>
+        </Card>
+      )}
+
+      {/* Delete Business Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeleteError('');
+        }}
+        title="Schedule Business Deletion (15-Day Grace Period)"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-2">
+            <p className="font-bold text-sm text-rose-200 flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-rose-400" />
+              Schedule '{profile?.tenant_name || 'Business'}' for Deletion
+            </p>
+            <p>
+              This action requires email verification. Upon confirmation, your workspace enters a <strong>15-day grace period</strong> and all employee logins will be suspended.
+            </p>
+            <p className="text-emerald-300 bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-800/40">
+              💡 <strong>Accidental Deletion Safeguard:</strong> Logging in again as the Business Owner at any time within 15 days will immediately cancel the deletion and restore all records.
+            </p>
+          </div>
+
+          {deleteError && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-500 dark:text-rose-400 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+              <span className="font-medium">{deleteError}</span>
+            </div>
+          )}
+
+          {deleteStep === 'initial' ? (
+            <div className="space-y-3 pt-2">
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                Click below to dispatch a secure <strong>6-digit confirmation OTP</strong> to your registered Business Owner email address (<strong>{profile?.email}</strong>).
+              </p>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <Button type="button" variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  icon={Mail}
+                  isLoading={isRequestingDeleteOtp}
+                  onClick={handleRequestDeleteOtp}
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+                >
+                  Send 6-Digit Deletion OTP
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleConfirmDelete} className="space-y-4 pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                  Enter 6-Digit Deletion Confirmation OTP
+                </label>
+                <input
+                  id="deleteOtpInput"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={deleteOtp}
+                  onChange={(e) => {
+                    setDeleteOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
+                    setDeleteError('');
+                  }}
+                  placeholder="• • • • • •"
+                  autoFocus
+                  className="w-full text-center tracking-[0.5em] font-mono text-2xl font-bold py-3 px-4 rounded-xl border border-rose-300 dark:border-rose-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-rose-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  onClick={handleRequestDeleteOtp}
+                  disabled={isRequestingDeleteOtp || deleteCountdown > 0}
+                  className="text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50 disabled:no-underline"
+                >
+                  {isRequestingDeleteOtp
+                    ? 'Sending...'
+                    : deleteCountdown > 0
+                    ? `Resend OTP in ${deleteCountdown}s`
+                    : 'Resend 6-Digit OTP'}
+                </button>
+                <span className="text-[11px] text-slate-400">OTP sent to {profile?.email}</span>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <Button type="button" variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="danger"
+                  icon={Trash2}
+                  isLoading={isConfirmingDelete}
+                  disabled={deleteOtp.length !== 6}
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+                >
+                  Confirm Deletion &amp; Suspend Business
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      </Modal>
     </form>
   );
 };

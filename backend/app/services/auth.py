@@ -215,6 +215,34 @@ def authenticate_user(
         db.commit()
         raise HTTPException(status_code=401, detail="A valid MFA code is required")
 
+    # Check Business Deletion & Suspension lifecycle
+    tenant = user.tenant
+    if tenant and tenant.deletion_requested_at:
+        due_at = as_utc(tenant.deletion_due_at) if tenant.deletion_due_at else None
+        if user.role.code != RoleCode.BUSINESS_OWNER:
+            raise HTTPException(
+                status_code=403,
+                detail="This business workspace is currently suspended and pending owner deletion. Only the Business Owner can log in within the 15-day grace period to restore the workspace.",
+            )
+        if due_at and now > due_at:
+            raise HTTPException(
+                status_code=403,
+                detail="The 15-day grace period has expired and this business account has been permanently deleted.",
+            )
+        # Automatic restoration for Business Owner logging in during the 15-day window
+        tenant.deletion_requested_at = None
+        tenant.deletion_due_at = None
+        tenant.deletion_requested_by_id = None
+        tenant.is_active = True
+        record_audit(
+            db,
+            event_type="auth.business_restored",
+            request=request,
+            tenant_id=tenant.id,
+            actor_user_id=user.id,
+            details={"message": "Business workspace successfully restored by owner login within 15-day grace period."},
+        )
+
     rate_limiter.record_auth_success(request, email)
     user.failed_login_count = 0
     user.locked_until = None

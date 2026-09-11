@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -17,7 +18,7 @@ from app.core.security import hash_password, random_token, utcnow
 from app.models.auth import AuthSession, SecurityToken, SecurityTokenPurpose
 from app.models.identity import Role, RoleCode, Store, User, UserStatus
 from app.models.performance import EmployeeTarget
-from app.schemas.auth import DevelopmentTokenResponse
+from app.schemas.auth import DevelopmentTokenResponse, TokenRequest
 from app.schemas.common import MessageResponse
 from app.schemas.users import (
     AccountStateRequest,
@@ -43,6 +44,8 @@ from app.services.auth import (
 from app.services.email_delivery import (
     EmailDeliveryError,
     require_production_email_delivery,
+    send_business_deletion_otp_email,
+    send_business_deletion_scheduled_email,
     send_invitation_email,
 )
 from app.services.identity import get_role, normalize_email, validate_store_scope
@@ -232,6 +235,118 @@ def update_business_profile(
     db.refresh(user)
     db.refresh(tenant)
     return serialize_user(user)
+
+
+@router.post("/me/business/request-delete-otp", response_model=DevelopmentTokenResponse)
+def request_business_deletion_otp(
+    request: Request,
+    user: CurrentUser,
+    db: DBSession,
+):
+    require_business_owner(user)
+    tenant = user.tenant
+
+    token = issue_security_token(
+        db,
+        user=user,
+        purpose=SecurityTokenPurpose.BUSINESS_DELETION,
+        is_otp=True,
+    )
+    email_sent = False
+    try:
+        email_sent = send_business_deletion_otp_email(
+            recipient=user.email,
+            full_name=user.full_name,
+            business_name=tenant.name,
+            token=token,
+        )
+    except Exception:
+        email_sent = False
+
+    record_audit(
+        db,
+        event_type="owner.business_deletion_otp_requested",
+        request=request,
+        tenant_id=user.tenant_id,
+        actor_user_id=user.id,
+        details={"email": user.email, "email_sent": email_sent},
+    )
+    db.commit()
+
+    return DevelopmentTokenResponse(
+        message=(
+            f"A 6-digit deletion confirmation OTP has been emailed to {user.email}."
+            if email_sent
+            else f"A 6-digit deletion confirmation OTP has been generated for {user.email}."
+        ),
+        token=token if settings.expose_development_tokens and not settings.is_production else None,
+    )
+
+
+@router.post("/me/business/confirm-delete", response_model=MessageResponse)
+def confirm_business_deletion(
+    payload: TokenRequest,
+    request: Request,
+    user: CurrentUser,
+    db: DBSession,
+):
+    require_business_owner(user)
+    token_str = (payload.token or "").strip()
+    if not token_str:
+        raise HTTPException(status_code=400, detail="Please enter the 6-digit confirmation OTP code")
+
+    # Validate and consume security token
+    consume_security_token(
+        db,
+        raw_token=token_str,
+        purpose=SecurityTokenPurpose.BUSINESS_DELETION,
+        user_id=user.id,
+    )
+
+    now = utcnow()
+    due_date = now + timedelta(days=15)
+    tenant = user.tenant
+    tenant.deletion_requested_at = now
+    tenant.deletion_due_at = due_date
+    tenant.deletion_requested_by_id = user.id
+    tenant.is_active = False
+
+    # Revoke all active sessions for all members of this tenant
+    member_ids = db.scalars(select(User.id).where(User.tenant_id == tenant.id)).all()
+    for mid in member_ids:
+        revoke_user_sessions(db, mid, reason="business_deletion_scheduled")
+
+    # Dispatch notification email confirming the 15-day grace period
+    try:
+        send_business_deletion_scheduled_email(
+            recipient=user.email,
+            full_name=user.full_name,
+            business_name=tenant.name,
+            due_date=due_date.strftime("%d %B %Y"),
+        )
+    except Exception:
+        pass
+
+    record_audit(
+        db,
+        event_type="owner.business_deletion_scheduled",
+        request=request,
+        tenant_id=tenant.id,
+        actor_user_id=user.id,
+        details={
+            "requested_at": now.isoformat(),
+            "due_at": due_date.isoformat(),
+            "grace_days": 15,
+        },
+    )
+    db.commit()
+
+    return MessageResponse(
+        message=(
+            f"Business workspace '{tenant.name}' has been scheduled for deletion and placed in a 15-day grace period until {due_date.strftime('%d %B %Y')}. "
+            "All active sessions have been terminated. Logging in as Business Owner within 15 days will automatically restore your workspace."
+        )
+    )
 
 
 def remove_avatar_file(avatar_url: str | None) -> None:

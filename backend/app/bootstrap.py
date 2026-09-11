@@ -46,6 +46,10 @@ def auto_migrate_schema() -> None:
             ("customers", "credit_terms", "VARCHAR(50) DEFAULT 'Net 30'"),
             ("customers", "territory_route", "VARCHAR(150) DEFAULT 'Central Market Route'"),
             ("customers", "location", "VARCHAR(255) DEFAULT 'Central Commercial Market'"),
+            # tenants table
+            ("tenants", "deletion_requested_at", "TIMESTAMP WITH TIME ZONE"),
+            ("tenants", "deletion_due_at", "TIMESTAMP WITH TIME ZONE"),
+            ("tenants", "deletion_requested_by_id", "UUID"),
         ]
 
         with engine.begin() as conn:

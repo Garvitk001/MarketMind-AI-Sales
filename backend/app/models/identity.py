@@ -40,11 +40,14 @@ class Tenant(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     currency: Mapped[str] = mapped_column(String(3), default="INR", nullable=False)
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Kolkata", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    deletion_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deletion_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deletion_requested_by_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     stores: Mapped[list[Store]] = relationship(
         back_populates="tenant", cascade="all, delete-orphan"
     )
-    users: Mapped[list[User]] = relationship(back_populates="tenant")
+    users: Mapped[list[User]] = relationship(back_populates="tenant", foreign_keys="User.tenant_id")
 
 
 class Store(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -126,7 +129,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    tenant: Mapped[Tenant] = relationship(back_populates="users")
+    tenant: Mapped[Tenant] = relationship(back_populates="users", foreign_keys=[tenant_id])
     store: Mapped[Store | None] = relationship()
     role: Mapped[Role] = relationship(back_populates="users", lazy="joined")
 

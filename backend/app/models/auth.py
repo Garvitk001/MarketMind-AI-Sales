@@ -12,6 +12,7 @@ class SecurityTokenPurpose(StrEnum):
     EMAIL_VERIFICATION = "email_verification"
     PASSWORD_RESET = "password_reset"
     INVITATION = "invitation"
+    BUSINESS_DELETION = "business_deletion"
 
 
 class AuthSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
