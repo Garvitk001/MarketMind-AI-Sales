@@ -5,6 +5,19 @@ index columns, unused marketplace fields and the complete source files are exclu
 files stay outside the repository because they are large and may have separate licence or
 redistribution conditions.
 
+## Business Setup & Onboarding CSV Templates
+
+Pre-formatted CSV templates designed for the **Business Setup & Guided Onboarding** module are located under [`data/templates/`](file:///d:/MarketMind/Team_1_Small_Biz_Sales_AI/data/templates):
+
+| Template File | Module Step | Required Columns | Sample Record |
+|---|---|---|---|
+| [`products_template.csv`](file:///d:/MarketMind/Team_1_Small_Biz_Sales_AI/data/templates/products_template.csv) | Step 1: Product Catalog | `sku,name,category,style,size,color` | `SKU-POS-501,Thermal Paper 80mm,Supplies,Standard,Box of 50,White` |
+| [`inventory_template.csv`](file:///d:/MarketMind/Team_1_Small_Biz_Sales_AI/data/templates/inventory_template.csv) | Step 2: Opening Inventory | `sku,stock_quantity,reorder_level` | `SKU-POS-501,150,25` |
+| [`customers_template.csv`](file:///d:/MarketMind/Team_1_Small_Biz_Sales_AI/data/templates/customers_template.csv) | Step 3: Customer Directory | `customer_id,last_purchase,order_count,item_quantity,total_revenue,recency_days` | `CUST-001,2026-08-25,12,48,145200.00,10` |
+| [`sales_template.csv`](file:///d:/MarketMind/Team_1_Small_Biz_Sales_AI/data/templates/sales_template.csv) | Step 4: Sales Transactions | `order_id,order_date,customer_id,sku,quantity,amount,currency` | `ORD-2026-101,2026-08-01,CUST-001,SKU-POS-501,10,4500.00,INR` |
+
+---
+
 ## Raw samples
 
 | File | Project use |

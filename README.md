@@ -56,12 +56,27 @@ MarketMind AI features an authentic, custom-designed logo and high-end visual de
 - **Complete Dashboard Localization**: 150+ dictionary keys covering metric cards, navigation items, table columns, action buttons, payment methods, order statuses, and time filters.
 - **Persistent Language Preference**: Seamless real-time switching between English and Hindi (`हिन्दी`) with automatic state persistence.
 
-### 🛡️ 4. Dynamic Role Onboarding & Email Conflict Protection
+### 🛡️ 4. Dynamic Role Onboarding & 6-Digit Email OTP Verification
 - **Role-Specific Onboarding**: Dynamic registration headers tailored to *Business Owner*, *Store Manager*, or *Sales Executive* with visible role selection badges.
-- **Cross-Role Collision Detection**: Proactively detects existing credentials across roles and alerts users with clear guidance rather than failing silently or causing unexpected role escalation.
-- **Mandatory Email OTP Verification**: 6-digit one-time password verification triggered via Resend API / SMTP before account access is granted.
+- **6-Digit Email OTP Verification**: When a new Business Owner registers, a 6-digit numeric OTP (`100000 - 999999`) is dispatched directly to their Gmail/Email inbox via Resend / SMTP.
+- **Live Resend with Cooldown**: The interactive verification popup features a 30-second cooldown timer, clean 6-digit formatted numeric input, and immediate activation.
+- **Secure Employee Activation**: Employees (Store Managers & Sales Executives) are invited by the Business Owner with a one-time activation token and set their own private passwords.
 
-### 💳 5. Flexible Sales & Payment Method Filtering
+### 📥 5. Guided Business Setup & CSV Data Onboarding Pipeline
+- **Step-by-Step Data Importer**: Complete multi-step import pipeline for new businesses to import legacy data:
+  1. **Product Catalog (`products_template.csv`)**: `sku,name,category,style,size,color`
+  2. **Opening Stock (`inventory_template.csv`)**: `sku,stock_quantity,reorder_level`
+  3. **Customer Directory (`customers_template.csv`)**: `customer_id,last_purchase,order_count,item_quantity,total_revenue,recency_days`
+  4. **Sales Transactions (`sales_template.csv`)**: `order_id,order_date,customer_id,sku,quantity,amount,currency`
+- **1-Click Downloadable Templates**: Ready-to-use CSV template files available in the UI and committed under [`data/templates/`](file:///d:/MarketMind/Team_1_Small_Biz_Sales_AI/data/templates).
+- **Auto-Retrain Triggers**: Seamlessly triggers ARIMA demand forecasts, RFM customer segmentation, and Collaborative Filtering recommendations once legacy datasets are imported.
+
+### 🧾 6. Indian Commercial B2B Tax Invoicing Engine
+- **Instant Client Typeahead & Selection**: Search and select any client (by company name, phone, GSTIN, or route) with 1-click selection and quick-register for new clients.
+- **Statutory GST Calculation**: Automated 50/50 CGST and SGST split (18% GST statutory rate) and commercial ledger summaries.
+- **Inventory Auto-Replenishment**: Smooth billing pipeline that auto-replenishes store stock on demand so invoice creation is never blocked by zero initial inventory.
+
+### 💳 7. Flexible Sales & Payment Method Filtering
 - **Multi-Rail Payment Filtering**: Case-insensitive and alias matching for Indian payment methods:
   - **UPI / QR Code**
   - **Cash on Delivery (COD)**
@@ -69,21 +84,22 @@ MarketMind AI features an authentic, custom-designed logo and high-end visual de
   - **Credit Ledger / Udhar Khata**
 - **Credit Receivables Aging (7-Day & 15-Day Limits)**: Automated tracking of current (0–7 days), due soon (8–15 days), and overdue (15+ days) credit accounts.
 
-### 👥 6. B2B Client Directory & Deep Search Persistence
+### 👥 8. B2B Client Directory & Deep Search Persistence
 - **Comprehensive Multi-Field Search**: Searches across Company Name, Contact Name, Email, Phone Number, GSTIN, and Customer ID.
-- **Immediate State Consistency**: Newly created B2B clients persist in search results with real-time customer count synchronization.
+- **Mandatory Phone Numbers & Zero Fake Data**: Enforces verified 7+ digit contact numbers on registration.
+- **Dues-Guarded Client Deletion**: Store Managers and Business Owners can delete client accounts only if all outstanding balances are fully settled (`outstanding_balance == 0`).
 
-### 🛒 7. Dynamic AI Product Recommender Engine
+### 🛒 9. Dynamic AI Product Recommender Engine
 - **Dynamic Catalog Synchronization**: Recommendation categories and filters are populated dynamically from live catalog data, eliminating category mismatch bugs.
 - **Multi-Level Matching**: Supports customer lookup by UUID or external code with customizable recommendation limits (up to 20 products).
 - **Association Rule Mining & Collaborative Filtering**: High-confidence cross-sell and up-sell suggestions based on basket co-occurrence.
 
-### 🛡️ 8. Anomaly Detection & Business Safeguards
+### 🛡️ 10. Anomaly Detection & Business Safeguards
 - **Multi-Factor Anomaly Engine**: Detects unusual revenue dips, transaction spikes, inventory discrepancies, and irregular discount patterns.
 - **Interactive Sensitivity Guide**: Transparent documentation explaining Isolation Forest contamination thresholds (*Strict 2%*, *Balanced 5%*, *High 10%*).
 - **Resolution Workflow**: Audit-logged acknowledge, investigate, and resolve workflow to track issue mitigation.
 
-### 🔄 9. Model Training & Refresh Calibration Feedback
+### 🔄 11. Model Training & Refresh Calibration Feedback
 - **Transparent Model Calibration**: Clicking **"Train & Refresh AI Models"** displays a detailed completion breakdown showing:
   - **ARIMA & Prophet Demand Models**: Calibrated against SKU sales velocity and seasonality.
   - **Collaborative Filtering Matrices**: Co-occurrence vectors updated with recent transactions.
