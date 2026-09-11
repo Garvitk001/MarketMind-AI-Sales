@@ -135,7 +135,7 @@ def create_transaction(
                         Inventory.store_id == store.id,
                         Inventory.product_id.in_(product_ids),
                     )
-                    .with_for_update()
+                    .with_for_update(of=Inventory)
                 ).all()
             }
 
@@ -147,7 +147,7 @@ def create_transaction(
                         store_id=store.id,
                         product_id=p_id,
                         stock_quantity=500,
-                        reorder_threshold=10,
+                        reorder_level=10,
                     )
                     db.add(inv)
                     db.flush()

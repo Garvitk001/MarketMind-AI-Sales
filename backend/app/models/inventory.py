@@ -52,7 +52,7 @@ class Inventory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     expiry_date: Mapped[str | None] = mapped_column(String(30))
 
 
-    product: Mapped[Product] = relationship(back_populates="inventory_records", lazy="joined")
+    product: Mapped[Product] = relationship(back_populates="inventory_records", lazy="selectin")
 
     @property
     def stock_status(self) -> str:
