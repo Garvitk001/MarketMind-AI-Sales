@@ -38,6 +38,18 @@ def issue_security_token(
         raw_token = f"{random.randint(100000, 999999)}"
     else:
         raw_token = random_token()
+
+    # Invalidate previous unconsumed tokens for this user & purpose
+    db.execute(
+        update(SecurityToken)
+        .where(
+            SecurityToken.user_id == user.id,
+            SecurityToken.purpose == purpose.value,
+            SecurityToken.consumed_at.is_(None),
+        )
+        .values(consumed_at=utcnow())
+    )
+
     security_token = SecurityToken(
         user_id=user.id,
         purpose=purpose.value,
@@ -53,16 +65,39 @@ def consume_security_token(
     *,
     raw_token: str,
     purpose: SecurityTokenPurpose,
+    user_id: UUID | None = None,
 ) -> User:
-    item = db.scalar(
-        select(SecurityToken).where(
+    query = (
+        select(SecurityToken)
+        .where(
             SecurityToken.token_hash == token_hash(raw_token),
             SecurityToken.purpose == purpose.value,
             SecurityToken.consumed_at.is_(None),
         )
     )
-    if not item or as_utc(item.expires_at) <= utcnow():
-        raise HTTPException(status_code=400, detail="Token is invalid or expired")
+    if user_id is not None:
+        query = query.where(SecurityToken.user_id == user_id)
+    query = query.order_by(SecurityToken.created_at.desc())
+
+    item = db.scalars(query).first()
+    if not item:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Incorrect 6-digit OTP code. Please enter the valid code sent to your email or request a new OTP."
+                if purpose == SecurityTokenPurpose.EMAIL_VERIFICATION
+                else "Invalid or incorrect security token."
+            ),
+        )
+    if as_utc(item.expires_at) <= utcnow():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "6-digit OTP code has expired. Please click Resend OTP to get a fresh code."
+                if purpose == SecurityTokenPurpose.EMAIL_VERIFICATION
+                else "Security token has expired. Please request a new one."
+            ),
+        )
     item.consumed_at = utcnow()
     return item.user
 

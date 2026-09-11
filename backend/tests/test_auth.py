@@ -107,3 +107,62 @@ def test_login_lockout_after_repeated_failures(client: TestClient):
         json={"email": "lockout@example.com", "password": TEST_PASSWORD},
     )
     assert locked.status_code == 423
+
+
+def test_registration_wrong_otp_and_resend_verification(client: TestClient):
+    # 1. Register new business owner
+    register = client.post(
+        "/api/v1/auth/register",
+        json={
+            "business_name": "Jaipur Textiles",
+            "store_name": "Bapu Bazaar",
+            "full_name": "Rohan Gupta",
+            "email": "rohan.gupta@example.com",
+            "password": TEST_PASSWORD,
+            "currency": "INR",
+            "timezone": "Asia/Kolkata",
+        },
+    )
+    assert register.status_code == 201
+    correct_token = register.json()["token"]
+    assert correct_token and len(correct_token) == 6
+
+    # 2. Try verifying with wrong OTP
+    wrong_verify = client.post(
+        "/api/v1/auth/verify-email",
+        json={"token": "999999", "email": "rohan.gupta@example.com"},
+    )
+    assert wrong_verify.status_code == 400
+    res_json = wrong_verify.json()
+    err_text = (res_json.get("message") or res_json.get("detail") or "").lower()
+    assert "incorrect" in err_text or "invalid" in err_text
+
+    # 3. Resend verification OTP
+    resend = client.post(
+        "/api/v1/auth/resend-verification-otp",
+        json={"email": "rohan.gupta@example.com"},
+    )
+    assert resend.status_code == 200
+    new_token = resend.json()["token"]
+    assert new_token and len(new_token) == 6
+
+    # Old token should now be consumed/revoked
+    old_verify = client.post(
+        "/api/v1/auth/verify-email",
+        json={"token": correct_token, "email": "rohan.gupta@example.com"},
+    )
+    assert old_verify.status_code == 400
+
+    # New token verifies successfully
+    new_verify = client.post(
+        "/api/v1/auth/verify-email",
+        json={"token": new_token, "email": "rohan.gupta@example.com"},
+    )
+    assert new_verify.status_code == 200
+
+    # Account is now active and can login
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "rohan.gupta@example.com", "password": TEST_PASSWORD},
+    )
+    assert login.status_code == 200

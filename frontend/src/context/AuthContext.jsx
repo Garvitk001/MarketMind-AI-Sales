@@ -106,10 +106,10 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify(payload)
     });
 
-  const verifyEmail = (token) =>
+  const verifyEmail = (token, email) =>
     request('/auth/verify-email', {
       method: 'POST',
-      body: JSON.stringify({ token })
+      body: JSON.stringify({ token, ...(email ? { email } : {}) })
     });
 
   const resendVerificationOtp = (email) =>

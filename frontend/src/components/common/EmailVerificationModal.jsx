@@ -71,11 +71,12 @@ export const EmailVerificationModal = () => {
       });
       await refreshProfile();
     } catch (err) {
-      setErrorMsg(err.message || 'Invalid or expired OTP code.');
+      const msg = err.message || 'Incorrect 6-digit OTP code. Please enter the valid code sent to your email.';
+      setErrorMsg(msg);
       addToast({
-        type: 'error',
+        type: 'danger',
         title: 'Verification Failed',
-        message: err.message || 'Failed to verify OTP code.'
+        message: msg
       });
     } finally {
       setIsLoading(false);

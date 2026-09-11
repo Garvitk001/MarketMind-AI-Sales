@@ -38,7 +38,7 @@ class SecurityToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
     purpose: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
-    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=False, index=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

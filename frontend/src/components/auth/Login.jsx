@@ -21,7 +21,8 @@ import {
   Building2,
   Store,
   ArrowLeft,
-  KeyRound
+  KeyRound,
+  AlertCircle
 } from 'lucide-react';
 
 export const Login = ({ initialMode = 'login', initialRole = 'owner', isDeveloperPortal = false, onBack }) => {
@@ -69,6 +70,7 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
   const [resetPassword, setResetPassword] = useState('');
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [verifyToken, setVerifyToken] = useState('');
+  const [verifyError, setVerifyError] = useState('');
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [resendCountdown, setResendCountdown] = useState(0);
   const [isResendingOtp, setIsResendingOtp] = useState(false);
@@ -239,6 +241,14 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
       const errMsg = error.message || '';
       if (errMsg.toLowerCase().includes('already exists') || errMsg.toLowerCase().includes('duplicate')) {
         setErrorMessage(`An account with email "${trimmedEmail}" already exists. If this email was used for another role (e.g. Business Owner), please register with a new email for this ${selectedRole === 'manager' ? 'Store Manager' : selectedRole === 'sales' ? 'Sales Executive' : 'Business'} account, or sign in directly.`);
+      } else if (errMsg.toLowerCase().includes('not verified')) {
+        setRegisteredEmail(trimmedEmail);
+        setVerifyToken('');
+        setVerifyError('');
+        setIsVerifyModalOpen(true);
+        setResendCountdown(30);
+        resendVerificationOtp(trimmedEmail).catch(() => {});
+        addToast('Your account is not verified yet. We sent a 6-digit OTP to your email.', 'info');
       } else {
         setErrorMessage(errMsg || 'Unable to complete authentication.');
       }
@@ -251,6 +261,7 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
     const targetEmail = registeredEmail || email.trim();
     if (!targetEmail || isResendingOtp || resendCountdown > 0) return;
     setIsResendingOtp(true);
+    setVerifyError('');
     try {
       const response = await resendVerificationOtp(targetEmail);
       addToast(response?.message || `New 6-digit OTP sent to ${targetEmail}`, 'info');
@@ -259,6 +270,7 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
       }
       setResendCountdown(30);
     } catch (err) {
+      setVerifyError(err.message || 'Failed to resend verification OTP.');
       addToast(err.message || 'Failed to resend verification OTP.', 'danger');
     } finally {
       setIsResendingOtp(false);
@@ -299,20 +311,24 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
 
   const handleVerifySubmit = async (e) => {
     e.preventDefault();
+    setVerifyError('');
     const cleanOtp = verifyToken.trim();
     if (!cleanOtp) {
+      setVerifyError('Please enter the 6-digit OTP sent to your email.');
       addToast('Please enter the 6-digit OTP sent to your email.', 'warning');
       return;
     }
     if (cleanOtp.length !== 6 || !/^\d+$/.test(cleanOtp)) {
+      setVerifyError('Please enter a valid 6-digit numeric OTP code.');
       addToast('Please enter a valid 6-digit numeric OTP.', 'warning');
       return;
     }
     setIsVerifying(true);
     try {
-      const response = await verifyEmail(cleanOtp);
+      const response = await verifyEmail(cleanOtp, registeredEmail || email.trim());
       addToast(response?.message || 'Email verified successfully! You can now sign in.', 'success');
       setIsVerifyModalOpen(false);
+      setVerifyError('');
       setAuthMode('login');
       if (registeredEmail) {
         setEmail(registeredEmail);
@@ -322,15 +338,19 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
       setBusinessName('');
       setStoreName('');
     } catch (error) {
-      if (error.message?.toLowerCase().includes('already') || error.message?.toLowerCase().includes('active') || error.message?.toLowerCase().includes('verified')) {
+      const msg = error.message || '';
+      if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('active') || msg.toLowerCase().includes('verified')) {
         addToast('Account is already verified and active! Please sign in.', 'success');
         setIsVerifyModalOpen(false);
+        setVerifyError('');
         setAuthMode('login');
         if (registeredEmail) {
           setEmail(registeredEmail);
         }
       } else {
-        addToast(error.message || 'Invalid or expired 6-digit OTP. Please check your Gmail or click Resend.', 'danger');
+        const errorDetail = msg || 'Incorrect 6-digit OTP code. Please check your email or click Resend.';
+        setVerifyError(errorDetail);
+        addToast(errorDetail, 'danger');
       }
     } finally {
       setIsVerifying(false);
@@ -867,7 +887,10 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
 
       <Modal
         isOpen={isVerifyModalOpen}
-        onClose={() => setIsVerifyModalOpen(false)}
+        onClose={() => {
+          setIsVerifyModalOpen(false);
+          setVerifyError('');
+        }}
         title="Verify Email with 6-Digit OTP"
       >
         <form onSubmit={handleVerifySubmit} className="space-y-4">
@@ -877,10 +900,17 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
             </div>
             <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
               We've dispatched a <strong className="text-indigo-600 dark:text-indigo-400 font-semibold">6-digit OTP</strong> code to{' '}
-              <strong className="text-slate-900 dark:text-white font-semibold underline">{registeredEmail || 'your email'}</strong>.
+              <strong className="text-slate-900 dark:text-white font-semibold underline">{registeredEmail || email || 'your email'}</strong>.
               Enter it below to verify your email and activate your business workspace.
             </div>
           </div>
+
+          {verifyError && (
+            <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-500 dark:text-rose-400 flex items-center gap-2.5 animate-shake">
+              <AlertCircle className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" />
+              <span className="font-semibold">{verifyError}</span>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
@@ -894,16 +924,23 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
                 pattern="[0-9]*"
                 maxLength={6}
                 value={verifyToken}
-                onChange={(e) => setVerifyToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(e) => {
+                  setVerifyToken(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  setVerifyError('');
+                }}
                 placeholder="• • • • • •"
                 autoFocus
-                className="w-full text-center tracking-[0.5em] font-mono text-2xl font-bold py-3 px-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700 placeholder:tracking-[0.3em]"
+                className={`w-full text-center tracking-[0.5em] font-mono text-2xl font-bold py-3 px-4 rounded-xl border ${
+                  verifyError
+                    ? 'border-rose-500 focus:ring-rose-500 focus:border-rose-500'
+                    : 'border-slate-300 dark:border-slate-700 focus:ring-indigo-500 focus:border-indigo-500'
+                } bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700 placeholder:tracking-[0.3em]`}
                 required
               />
             </div>
           </div>
 
-          {verifyToken && verifyToken.length === 6 && (
+          {verifyToken && verifyToken.length === 6 && !verifyError && (
             <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60">
               <span className="flex items-center gap-1.5 font-medium">
                 <CheckCircle2 className="w-4 h-4" /> 6-digit OTP code ready
@@ -930,7 +967,14 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-            <Button type="button" variant="ghost" onClick={() => setIsVerifyModalOpen(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setIsVerifyModalOpen(false);
+                setVerifyError('');
+              }}
+            >
               Verify Later
             </Button>
             <Button type="submit" variant="primary" isLoading={isVerifying} disabled={verifyToken.length !== 6}>

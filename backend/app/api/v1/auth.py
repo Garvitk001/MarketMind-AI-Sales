@@ -151,11 +151,21 @@ def register(payload: RegisterRequest, request: Request, db: DBSession):
 @router.post("/verify-email", response_model=MessageResponse)
 def verify_email(payload: TokenRequest, request: Request, db: DBSession):
     token_str = (payload.token or "").strip()
+    if not token_str:
+        raise HTTPException(status_code=400, detail="Please enter the 6-digit OTP code")
+
+    target_user = None
+    if payload.email:
+        target_user = find_user_by_email(db, payload.email)
+        if target_user and target_user.email_verified_at and target_user.status == UserStatus.ACTIVE:
+            return MessageResponse(message="Email address is already verified and active. You can log in directly.")
+
     try:
         user = consume_security_token(
             db,
             raw_token=token_str,
             purpose=SecurityTokenPurpose.EMAIL_VERIFICATION,
+            user_id=target_user.id if target_user else None,
         )
         user.email_verified_at = utcnow()
         user.status = UserStatus.ACTIVE
@@ -513,29 +523,27 @@ def request_email_verification_otp(
     if not target_email:
         raise HTTPException(status_code=400, detail="Target email address is required")
 
-    import random
-    otp_code = f"{random.randint(100000, 999999)}"
-
     target_user = user or find_user_by_email(db, target_email)
-    if target_user:
-        issue_security_token(
-            db,
-            user=target_user,
-            purpose=SecurityTokenPurpose.EMAIL_VERIFICATION,
+    if not target_user:
+        raise HTTPException(status_code=404, detail="No account found with this email address")
+
+    if target_user.email_verified_at and target_user.status == UserStatus.ACTIVE:
+        return DevelopmentTokenResponse(
+            message="Your account is already active and verified.",
+            token=None,
         )
+
+    token = issue_security_token(
+        db,
+        user=target_user,
+        purpose=SecurityTokenPurpose.EMAIL_VERIFICATION,
+        is_otp=True,
+    )
 
     email_sent = False
     try:
-        email_sent = send_security_email(
-            recipient=target_email,
-            subject="🔐 MarketMind Email Verification OTP",
-            body=(
-                f"Hello,\n\n"
-                f"Your 6-digit verification code to confirm your Gmail / Email on MarketMind is:\n\n"
-                f"👉  {otp_code}  👈\n\n"
-                f"This code will expire in 10 minutes. Enter it in your MarketMind dashboard popup to complete email verification.\n\n"
-                f"— MarketMind Security Team"
-            ),
+        email_sent = send_verification_email(
+            recipient=target_user.email, full_name=target_user.full_name, token=token
         )
     except Exception:
         email_sent = False
@@ -544,15 +552,15 @@ def request_email_verification_otp(
         db,
         event_type="auth.email_verification_otp_requested",
         request=request,
-        tenant_id=target_user.tenant_id if target_user else None,
-        actor_user_id=target_user.id if target_user else None,
+        tenant_id=target_user.tenant_id,
+        actor_user_id=target_user.id,
         details={"target_email": target_email, "email_sent": email_sent},
     )
     db.commit()
 
     return DevelopmentTokenResponse(
         message=f"Verification OTP sent to {target_email}." if email_sent else f"Verification OTP generated for {target_email}.",
-        token=otp_code if (not settings.is_production or not email_sent) else None,
+        token=token if (settings.expose_development_tokens and not settings.is_production) else None,
     )
 
 
@@ -564,24 +572,31 @@ def verify_email_otp(
     db: DBSession,
 ):
     rate_limiter.check_rate_limit(request, tier="auth")
-    otp_clean = payload.otp.strip()
+    otp_clean = (payload.otp or "").strip()
     if not otp_clean or len(otp_clean) != 6 or not otp_clean.isdigit():
-        raise HTTPException(status_code=400, detail="Please enter a valid 6-digit OTP code")
+        raise HTTPException(status_code=400, detail="Incorrect 6-digit OTP code. Please enter the valid 6-digit numeric OTP sent to your email.")
 
-    user.email_verified_at = utcnow()
-    if user.status == UserStatus.INVITED:
-        user.status = UserStatus.ACTIVE
+    verified_user = consume_security_token(
+        db,
+        raw_token=otp_clean,
+        purpose=SecurityTokenPurpose.EMAIL_VERIFICATION,
+        user_id=user.id,
+    )
+
+    verified_user.email_verified_at = utcnow()
+    if verified_user.status == UserStatus.INVITED:
+        verified_user.status = UserStatus.ACTIVE
 
     record_audit(
         db,
         event_type="auth.email_verified_via_otp",
         request=request,
-        tenant_id=user.tenant_id,
-        actor_user_id=user.id,
-        details={"email": user.email},
+        tenant_id=verified_user.tenant_id,
+        actor_user_id=verified_user.id,
+        details={"email": verified_user.email},
     )
     db.commit()
-    db.refresh(user)
+    db.refresh(verified_user)
 
     return EmailVerificationResponse(
         message="Your email address has been verified successfully!",

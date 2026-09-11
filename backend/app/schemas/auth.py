@@ -38,6 +38,7 @@ class DevelopmentTokenResponse(BaseModel):
 
 class TokenRequest(BaseModel):
     token: str = Field(min_length=6, max_length=256)
+    email: EmailStr | None = None
 
 
 class PasswordResetRequest(BaseModel):
