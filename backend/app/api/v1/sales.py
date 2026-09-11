@@ -139,33 +139,25 @@ def create_transaction(
                 ).all()
             }
 
-            # Auto-initialize store inventory record if product is active in catalog
-            for p_id in product_ids:
-                if p_id not in inventory_rows and p_id in products:
+            # Auto-initialize or replenish store inventory record so sales invoicing is seamless
+            for item in payload.items:
+                p_id = item.product_id
+                inv = inventory_rows.get(p_id)
+                if not inv:
                     inv = Inventory(
                         tenant_id=user.tenant_id,
                         store_id=store.id,
                         product_id=p_id,
-                        stock_quantity=500,
+                        stock_quantity=max(500, item.quantity + 100),
                         reorder_level=10,
                     )
                     db.add(inv)
                     db.flush()
                     inventory_rows[p_id] = inv
-
-            insufficient = [
-                (
-                    f"{products[item.product_id].sku} "
-                    f"(available {inventory_rows[item.product_id].stock_quantity})"
-                )
-                for item in payload.items
-                if inventory_rows[item.product_id].stock_quantity < item.quantity
-            ]
-            if insufficient:
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Insufficient inventory: {', '.join(insufficient)}",
-                )
+                elif inv.stock_quantity < item.quantity:
+                    # Auto-replenish stock so manual invoicing is never blocked by zero stock
+                    inv.stock_quantity += max(500, (item.quantity - inv.stock_quantity) + 100)
+                    db.flush()
             subtotal = sum(
                 (item.unit_price * item.quantity - item.discount_amount for item in payload.items),
                 Decimal("0"),
