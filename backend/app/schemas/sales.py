@@ -24,14 +24,12 @@ class SalesTransactionCreate(BaseModel):
     items: list[SalesLineItemCreate] = Field(default_factory=list, max_length=100)
     order_discount: Decimal = Field(default=Decimal("0"), ge=0, max_digits=14, decimal_places=2)
     tax_amount: Decimal = Field(default=Decimal("0"), ge=0, max_digits=14, decimal_places=2)
-    payment_method: str | None = Field(
-        default=None,
-        max_length=30,
-        pattern="^(cash|upi|card|bank_transfer|other)$",
-    )
+    payment_method: str | None = Field(default=None, max_length=60)
     payment_status: str | None = Field(default="paid", max_length=30)
     delivery_status: str | None = Field(default="pending", max_length=30)
-    customer_reference: str | None = Field(default=None, max_length=80)
+    customer_id: UUID | None = None
+    customer_reference: str | None = Field(default=None, max_length=255)
+    credit_terms: str | None = Field(default="Net 30", max_length=50)
     notes: str | None = Field(default=None, max_length=500)
 
     @model_validator(mode="after")

@@ -77,15 +77,18 @@ def create_transaction(
     if user.store_id and user.store_id != store.id:
         raise HTTPException(status_code=403, detail="Transaction is outside your store scope")
     occurred_at = payload.occurred_at or datetime.now(UTC)
-    if payload.external_reference and db.scalar(
+    ext_ref = payload.external_reference.strip() if payload.external_reference else None
+    if ext_ref and db.scalar(
         select(SalesTransaction.id).where(
             SalesTransaction.tenant_id == user.tenant_id,
             SalesTransaction.store_id == store.id,
-            SalesTransaction.source_system.in_(["manual", "manual_pos"]),
-            SalesTransaction.external_reference == payload.external_reference,
+            SalesTransaction.external_reference == ext_ref,
         )
     ):
-        raise HTTPException(status_code=409, detail="Transaction reference already exists")
+        raise HTTPException(status_code=409, detail="Transaction reference already exists in this store")
+
+    if not ext_ref:
+        ext_ref = f"INV-{datetime.now(UTC).strftime('%Y%m%d')}-{random_token()[:4].upper()}"
 
     if payload.items:
         product_ids = [line.product_id for line in payload.items]
@@ -150,15 +153,23 @@ def create_transaction(
             raise HTTPException(status_code=422, detail="Calculated order total must be positive")
         customer = None
         customer_snapshot = None
-        if payload.customer_reference:
+        if payload.customer_id:
+            customer = db.scalar(
+                select(Customer).where(
+                    Customer.tenant_id == user.tenant_id,
+                    Customer.id == payload.customer_id,
+                )
+            )
+        if not customer and payload.customer_reference:
             from sqlalchemy import or_
+            ref_clean = payload.customer_reference.strip()
             customer = db.scalar(
                 select(Customer)
                 .where(
                     Customer.tenant_id == user.tenant_id,
                     or_(
-                        Customer.external_customer_id == payload.customer_reference.strip(),
-                        Customer.company_name == payload.customer_reference.strip(),
+                        Customer.external_customer_id == ref_clean,
+                        Customer.company_name == ref_clean,
                     ),
                 )
                 .order_by(Customer.created_at)
@@ -166,17 +177,29 @@ def create_transaction(
             )
             recency = max(0, (datetime.now(UTC).date() - occurred_at.date()).days)
             if customer is None:
+                cust_ext_id = ref_clean
+                existing_cust = db.scalar(
+                    select(Customer.id).where(
+                        Customer.tenant_id == user.tenant_id,
+                        Customer.source_system == "manual_pos",
+                        Customer.external_customer_id == cust_ext_id,
+                    )
+                )
+                if existing_cust:
+                    cust_ext_id = f"{cust_ext_id}-{random_token()[:4]}"
+
                 customer = Customer(
                     tenant_id=user.tenant_id,
                     assigned_seller_id=user.id,
                     source_system="manual_pos",
-                    external_customer_id=payload.customer_reference.strip(),
-                    company_name=payload.customer_reference.strip(),
+                    external_customer_id=cust_ext_id,
+                    company_name=ref_clean,
                     last_purchase=occurred_at,
                     order_count=0,
                     item_quantity=0,
-                    total_revenue=Decimal("0"),
+                    total_revenue=Decimal("0.00"),
                     recency_days=recency,
+                    location="Central Commercial Market",
                 )
                 db.add(customer)
                 db.flush()
@@ -188,29 +211,29 @@ def create_transaction(
                     "contact_phone": customer.contact_phone,
                     "territory_route": customer.territory_route,
                 }
-            else:
-                customer_snapshot = {
-                    "created": False,
-                    "company_name": customer.company_name or customer.external_customer_id,
-                    "gstin": customer.gstin,
-                    "location": customer.location,
-                    "contact_phone": customer.contact_phone,
-                    "territory_route": customer.territory_route,
-                    "assigned_seller_id": (
-                        str(customer.assigned_seller_id) if customer.assigned_seller_id else None
-                    ),
-                    "last_purchase": customer.last_purchase.isoformat() if customer.last_purchase else None,
-                    "order_count": customer.order_count,
-                    "item_quantity": customer.item_quantity,
-                    "total_revenue": str(customer.total_revenue),
-                    "recency_days": customer.recency_days,
-                }
+        if customer and not customer_snapshot:
+            customer_snapshot = {
+                "created": False,
+                "company_name": customer.company_name or customer.external_customer_id,
+                "gstin": customer.gstin,
+                "location": customer.location,
+                "contact_phone": customer.contact_phone,
+                "territory_route": customer.territory_route,
+                "assigned_seller_id": (
+                    str(customer.assigned_seller_id) if customer.assigned_seller_id else None
+                ),
+                "last_purchase": customer.last_purchase.isoformat() if customer.last_purchase else None,
+                "order_count": customer.order_count or 0,
+                "item_quantity": customer.item_quantity or 0,
+                "total_revenue": str(customer.total_revenue or 0),
+                "recency_days": customer.recency_days or 0,
+            }
         transaction = SalesTransaction(
             tenant_id=user.tenant_id,
             store_id=store.id,
             seller_id=user.id,
             source_system="manual_pos",
-            external_reference=payload.external_reference,
+            external_reference=ext_ref,
             occurred_at=occurred_at,
             currency=payload.currency.upper(),
             total_amount=total,
@@ -220,9 +243,10 @@ def create_transaction(
             subtotal_amount=subtotal,
             discount_amount=payload.order_discount,
             tax_amount=payload.tax_amount,
-            payment_method=payload.payment_method,
+            payment_method=payload.payment_method or "upi",
             payment_status=payload.payment_status or "paid",
             delivery_status=payload.delivery_status or "pending",
+            credit_terms=payload.credit_terms or "Net 30",
             customer_id=customer.id if customer else None,
             customer_snapshot=customer_snapshot,
         )
@@ -243,12 +267,15 @@ def create_transaction(
             )
         if customer:
             customer.assigned_seller_id = user.id
-            customer.last_purchase = max(
-                as_utc(customer.last_purchase), as_utc(occurred_at)
-            )
-            customer.order_count += 1
-            customer.item_quantity += transaction.item_count
-            customer.total_revenue += transaction.total_amount
+            if customer.last_purchase:
+                customer.last_purchase = max(
+                    as_utc(customer.last_purchase), as_utc(occurred_at)
+                )
+            else:
+                customer.last_purchase = as_utc(occurred_at)
+            customer.order_count = (customer.order_count or 0) + 1
+            customer.item_quantity = (customer.item_quantity or 0) + transaction.item_count
+            customer.total_revenue = Decimal(str(customer.total_revenue or 0)) + Decimal(str(transaction.total_amount))
             customer.recency_days = max(
                 0, (datetime.now(UTC).date() - customer.last_purchase.date()).days
             )
@@ -258,19 +285,19 @@ def create_transaction(
             store_id=store.id,
             seller_id=user.id,
             source_system="manual",
-            external_reference=payload.external_reference,
-            occurred_at=payload.occurred_at,
+            external_reference=ext_ref,
+            occurred_at=payload.occurred_at or occurred_at,
             currency=payload.currency.upper(),
             total_amount=payload.total_amount,
             item_count=payload.item_count,
             status=TransactionStatus.COMPLETED,
             payment_status=payload.payment_status or "paid",
             delivery_status=payload.delivery_status or "pending",
+            credit_terms=payload.credit_terms or "Net 30",
             notes=payload.notes,
         )
         db.add(transaction)
-    db.add(transaction)
-    db.flush()
+        db.flush()
     record_audit(
         db,
         event_type="sales.transaction_created",

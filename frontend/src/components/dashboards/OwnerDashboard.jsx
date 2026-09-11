@@ -311,6 +311,11 @@ export const OwnerDashboard = ({ onNavigate }) => {
     const outForDelivery = deals.filter((d) => d.delivery_status === 'out_for_delivery');
     const pending = deals.filter((d) => !d.delivery_status || d.delivery_status === 'pending');
 
+    const todayStr = new Date().toDateString();
+    const todayDeals = deals.filter((d) => d.occurred_at && new Date(d.occurred_at).toDateString() === todayStr);
+    const deliveredToday = todayDeals.filter((d) => d.delivery_status === 'delivered');
+    const pendingToday = todayDeals.filter((d) => d.delivery_status !== 'delivered');
+
     const deliveredVal = delivered.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
     const outForDeliveryVal = outForDelivery.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
     const pendingVal = pending.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
@@ -326,7 +331,12 @@ export const OwnerDashboard = ({ onNavigate }) => {
       pendingVal,
       totalCount: deals.length,
       totalVal,
-      fulfillmentRate
+      fulfillmentRate,
+      todayTotalCount: todayDeals.length,
+      deliveredTodayCount: deliveredToday.length,
+      deliveredTodayVal: deliveredToday.reduce((sum, d) => sum + Number(d.total_amount || 0), 0),
+      pendingTodayCount: pendingToday.length,
+      pendingTodayVal: pendingToday.reduce((sum, d) => sum + Number(d.total_amount || 0), 0),
     };
   }, [salesTransactions]);
 
@@ -697,6 +707,24 @@ export const OwnerDashboard = ({ onNavigate }) => {
           </div>
         </CardHeader>
 
+        {/* Today's Delivery Pulse Banner */}
+        <div className="p-3 mb-2 rounded-xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-slate-900/40 border border-blue-500/20 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-200">📅 Today's Delivery Status:</span>
+            <span className="text-slate-400 font-medium">({deliveryStats.todayTotalCount} Orders logged today)</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Delivered Today: {deliveryStats.deliveredTodayCount} ({money(deliveryStats.deliveredTodayVal)})
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 font-semibold border border-amber-500/30">
+              <Clock className="w-3.5 h-3.5" />
+              Pending Today: {deliveryStats.pendingTodayCount} ({money(deliveryStats.pendingTodayVal)})
+            </span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
           {/* Delivered */}
           <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-1">
@@ -706,14 +734,14 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 {t('Delivered Orders')}
               </span>
               <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500">
-                {deliveryStats.deliveredCount} Orders
+                {deliveryStats.deliveredCount} Total
               </span>
             </div>
             <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
               {money(deliveryStats.deliveredVal)}
             </p>
             <p className="text-[10px] text-slate-500 dark:text-slate-400">
-              Goods successfully received and signed by clients
+              ✅ Today: {deliveryStats.deliveredTodayCount} delivered ({money(deliveryStats.deliveredTodayVal)})
             </p>
           </div>
 
@@ -725,7 +753,7 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 {t('Out for Delivery')}
               </span>
               <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                {deliveryStats.outForDeliveryCount} Orders
+                {deliveryStats.outForDeliveryCount} Active
               </span>
             </div>
             <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-2">
@@ -744,14 +772,14 @@ export const OwnerDashboard = ({ onNavigate }) => {
                 {t('Pending Dispatch')}
               </span>
               <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-500">
-                {deliveryStats.pendingCount} Orders
+                {deliveryStats.pendingCount} Total
               </span>
             </div>
             <p className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-2">
               {money(deliveryStats.pendingVal)}
             </p>
             <p className="text-[10px] text-slate-500 dark:text-slate-400">
-              Invoiced and awaiting warehouse packing / vehicle assignment
+              ⏳ Today: {deliveryStats.pendingTodayCount} pending ({money(deliveryStats.pendingTodayVal)})
             </p>
           </div>
         </div>

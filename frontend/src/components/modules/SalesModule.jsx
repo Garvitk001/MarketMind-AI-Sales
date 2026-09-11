@@ -72,6 +72,7 @@ export const SalesModule = () => {
   const [invoiceTransaction, setInvoiceTransaction] = useState(null);
 
   // Quick Client Creation State
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
   const [isQuickAddClientOpen, setIsQuickAddClientOpen] = useState(false);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [newClientForm, setNewClientForm] = useState({
@@ -125,6 +126,22 @@ export const SalesModule = () => {
     return { totalVolume, clearedCash, outstandingCredit, overdueCount };
   }, [deals]);
 
+  // Today's Delivery Fulfillment Statistics
+  const todayDeliveryStats = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    const todayDeals = deals.filter((d) => d.occurred_at && new Date(d.occurred_at).toDateString() === todayStr);
+    const deliveredToday = todayDeals.filter((d) => d.delivery_status === 'delivered');
+    const pendingToday = todayDeals.filter((d) => d.delivery_status !== 'delivered');
+
+    return {
+      todayCount: todayDeals.length,
+      deliveredCount: deliveredToday.length,
+      deliveredAmount: deliveredToday.reduce((sum, d) => sum + Number(d.total_amount || 0), 0),
+      pendingCount: pendingToday.length,
+      pendingAmount: pendingToday.reduce((sum, d) => sum + Number(d.total_amount || 0), 0),
+    };
+  }, [deals]);
+
   // Delivery Tracking KPIs
   const deliveryKpis = useMemo(() => {
     const deliveredDeals = deals.filter((d) => d.delivery_status === 'delivered');
@@ -147,6 +164,19 @@ export const SalesModule = () => {
     };
   }, [deals]);
 
+  // Client Search Filter for Invoice Creation Modal
+  const filteredCustomers = useMemo(() => {
+    if (!clientSearchQuery.trim()) return customers || [];
+    const q = clientSearchQuery.toLowerCase().trim();
+    return (customers || []).filter((c) => {
+      const name = String(c.company_name || c.name || '').toLowerCase();
+      const phone = String(c.contact_phone || '').toLowerCase();
+      const gstin = String(c.gstin || '').toLowerCase();
+      const location = String(c.location || '').toLowerCase();
+      return name.includes(q) || phone.includes(q) || gstin.includes(q) || location.includes(q);
+    });
+  }, [customers, clientSearchQuery]);
+
   const filteredDeals = deals.filter((deal) => {
     const customerObj = (customers || []).find((c) => c.id === deal.customer_id);
     const custName = customerObj ? (customerObj.company_name || customerObj.name) : (deal.customer_reference || '');
@@ -154,7 +184,18 @@ export const SalesModule = () => {
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
     const matchesPayment = paymentFilter === 'all' || deal.payment_status === paymentFilter;
-    const matchesDelivery = deliveryFilter === 'all' || deal.delivery_status === deliveryFilter;
+
+    let matchesDelivery = true;
+    if (deliveryFilter === 'delivered_today') {
+      const isToday = deal.occurred_at && new Date(deal.occurred_at).toDateString() === new Date().toDateString();
+      matchesDelivery = isToday && deal.delivery_status === 'delivered';
+    } else if (deliveryFilter === 'pending_today') {
+      const isToday = deal.occurred_at && new Date(deal.occurred_at).toDateString() === new Date().toDateString();
+      matchesDelivery = isToday && deal.delivery_status !== 'delivered';
+    } else if (deliveryFilter !== 'all') {
+      matchesDelivery = deal.delivery_status === deliveryFilter;
+    }
+
     const matchesMethod = methodFilter === 'all' || (() => {
       const method = String(deal.payment_method || '').toLowerCase().trim();
       if (methodFilter === 'upi') return method.includes('upi') || method.includes('qr');
@@ -216,7 +257,13 @@ export const SalesModule = () => {
     try {
       setCatalog(await api('/sales/catalog'));
       setSelected(null);
-      setForm(emptyForm());
+      const generatedRef = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      setForm({
+        ...emptyForm(),
+        externalReference: generatedRef,
+        occurredAt: new Date().toISOString().slice(0, 16),
+      });
+      setClientSearchQuery('');
       setIsQuickAddClientOpen(false);
       setModalMode('create');
     } catch (error) {
@@ -351,17 +398,19 @@ export const SalesModule = () => {
         await api('/sales/transactions', {
           method: 'POST',
           body: JSON.stringify({
-            external_reference: payload.external_reference,
-            occurred_at: payload.occurred_at,
-            store_id: profile?.store_id || user?.store_id || undefined,
+            external_reference: form.externalReference.trim() || undefined,
+            occurred_at: new Date(form.occurredAt).toISOString(),
+            store_id: profile?.store_id || undefined,
             currency: (form.currency || 'INR').toUpperCase(),
-            payment_method: form.paymentMethod,
-            payment_status: form.paymentStatus,
-            delivery_status: form.deliveryStatus,
-            customer_reference: custRef || null,
+            payment_method: form.paymentMethod || 'upi',
+            payment_status: form.paymentStatus || 'paid',
+            delivery_status: form.deliveryStatus || 'pending',
+            customer_id: form.selectedCustomerId || undefined,
+            customer_reference: custRef || undefined,
+            credit_terms: form.creditTerms || 'Net 30',
             order_discount: Number(form.orderDiscount || 0),
             tax_amount: Number(orderSummary.tax),
-            notes: payload.notes,
+            notes: form.notes.trim() || undefined,
             items: form.items.map((item) => ({
               product_id: item.productId,
               quantity: Number(item.quantity),
@@ -377,7 +426,8 @@ export const SalesModule = () => {
           body: JSON.stringify({
             ...payload,
             payment_status: form.paymentStatus,
-            delivery_status: form.deliveryStatus
+            delivery_status: form.deliveryStatus,
+            credit_terms: form.creditTerms
           })
         });
         addToast('Sales transaction updated successfully.', 'success');
@@ -535,20 +585,20 @@ export const SalesModule = () => {
         {/* Delivery Fulfillment KPI Card */}
         <Card className="p-4 bg-gradient-to-br from-blue-900/20 to-slate-900/40 border-blue-500/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Order Delivery Status</span>
+            <span className="text-xs font-semibold text-slate-400">Order Delivery & Logistics</span>
             <Truck className="w-4 h-4 text-blue-400" />
           </div>
           <div className="mt-2 flex items-baseline justify-between">
             <p className="text-xl font-bold text-emerald-400">
-              {deliveryKpis.deliveredCount} <span className="text-xs font-medium text-slate-400">Delivered</span>
+              {todayDeliveryStats.deliveredCount} <span className="text-xs font-medium text-slate-400">Delivered Today</span>
             </p>
             <span className="text-[11px] font-bold text-blue-400">
-              {deliveryKpis.fulfillmentRate}% Fulfilled
+              {deliveryKpis.fulfillmentRate}% Total
             </span>
           </div>
           <p className="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
-            <span>🚚 Out: {deliveryKpis.outForDeliveryCount}</span>
-            <span>⏳ Pending: {deliveryKpis.pendingCount}</span>
+            <span>⏳ Pending Today: {todayDeliveryStats.pendingCount} (₹{todayDeliveryStats.pendingAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })})</span>
+            <span>✅ All Time: {deliveryKpis.deliveredCount}</span>
           </p>
         </Card>
       </div>
@@ -643,9 +693,11 @@ export const SalesModule = () => {
               <span className="text-[10px] font-bold text-slate-400 px-2 uppercase">Delivery:</span>
               {[
                 { id: 'all', label: 'All' },
+                { id: 'delivered_today', label: `⚡ Delivered Today (${todayDeliveryStats.deliveredCount})` },
+                { id: 'pending_today', label: `⏳ Pending Today (${todayDeliveryStats.pendingCount})` },
                 { id: 'delivered', label: '✅ Delivered' },
                 { id: 'out_for_delivery', label: '🚚 Out for Delivery' },
-                { id: 'pending', label: '⏳ Pending' }
+                { id: 'pending', label: '📦 Backlog' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -664,45 +716,49 @@ export const SalesModule = () => {
         </CardHeader>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-4">Invoice & Order Type</th>
-                <th className="py-3 px-4">Client Company / Retailer</th>
-                <th className="py-3 px-4">Payment & Terms</th>
-                <th className="py-3 px-4">Delivery & Fulfillment</th>
-                <th className="py-3 px-4">Invoice Amount</th>
-                <th className="py-3 px-4">Items / Volume</th>
-                <th className="py-3 px-4 text-right">Commercial Actions</th>
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 text-slate-500 uppercase tracking-wider">
+                <th className="py-3 px-4 font-semibold">Invoice &amp; Order Type</th>
+                <th className="py-3 px-4 font-semibold">Client Company / Retailer</th>
+                <th className="py-3 px-4 font-semibold">Status &amp; Terms</th>
+                <th className="py-3 px-4 font-semibold">Delivery &amp; Fulfillment</th>
+                <th className="py-3 px-4 font-semibold">Invoice Amount</th>
+                <th className="py-3 px-4 font-semibold">Items / Volume</th>
+                <th className="py-3 px-4 font-semibold text-right">Commercial Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredDeals.map((deal) => {
-                const cust = getCustomerObj(deal);
-                const channel = getChannelBadge(deal.source_system);
+                const customerObj = getCustomerObj(deal);
+                const custName = customerObj ? (customerObj.company_name || customerObj.name) : (deal.customer_reference || 'Walk-in Buyer');
+                const badge = getChannelBadge(deal.source_system);
                 const isPendingPayment = deal.payment_status === 'unpaid' || deal.payment_status === 'overdue';
 
                 return (
-                  <tr key={deal.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    {/* Invoice Ref & Channel */}
+                  <tr key={deal.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                    {/* Invoice ID & Source */}
                     <td className="py-3 px-4">
-                      <p className="font-bold text-slate-900 dark:text-slate-100">{deal.displayReference}</p>
-                      <span className={`inline-block mt-0.5 text-[10px] font-semibold px-2 py-0.5 rounded border ${channel.color}`}>
-                        {channel.label}
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
+                          {deal.displayReference}
+                        </span>
+                      </div>
+                      <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold border ${badge.color}`}>
+                        {badge.label}
                       </span>
                     </td>
 
-                    {/* Client Company / Retailer */}
+                    {/* Client Company & GSTIN */}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <Building2 className="w-4 h-4 text-indigo-400 flex-shrink-0" />
                         <div>
-                          <p className="font-bold text-slate-800 dark:text-slate-200">
-                            {cust ? (cust.company_name || cust.name) : (deal.customer_reference || 'Walk-in Buyer')}
+                          <p className="font-bold text-slate-900 dark:text-slate-100 truncate max-w-[170px]">
+                            {custName}
                           </p>
-                          <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
-                            {cust?.location && <span>📍 {cust.location}</span>}
-                            <span>{cust?.gstin ? `GSTIN: ${cust.gstin}` : (cust?.territory_route ? `Route: ${cust.territory_route}` : 'Counter Sale')}</span>
+                          <p className="text-[10px] text-slate-400 truncate max-w-[170px]">
+                            {customerObj?.gstin ? `GST: ${customerObj.gstin}` : 'Counter Sale'} · {customerObj?.location || 'Direct Store'}
                           </p>
                         </div>
                       </div>
@@ -711,71 +767,79 @@ export const SalesModule = () => {
                     {/* Payment Status & Terms */}
                     <td className="py-3 px-4">
                       <div className="space-y-1">
-                        <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${
-                            deal.payment_status === 'overdue'
-                              ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
-                              : deal.payment_status === 'unpaid'
-                              ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                              : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30'
-                          }`}
+                        <Badge
+                          variant={
+                            deal.payment_status === 'paid'
+                              ? 'success'
+                              : deal.payment_status === 'overdue'
+                              ? 'danger'
+                              : 'warning'
+                          }
+                          size="sm"
                         >
-                          {deal.payment_status === 'overdue' && <AlertTriangle className="w-3 h-3" />}
-                          {deal.payment_status === 'unpaid' && <Clock className="w-3 h-3" />}
-                          {deal.payment_status === 'paid' && <CheckCircle2 className="w-3 h-3" />}
-                          <span>{deal.payment_status || 'Paid'}</span>
-                        </span>
-                        <p className="text-[10px] text-slate-400 font-mono">
-                          Terms: {deal.credit_terms || 'Net 30'} · {deal.payment_method?.toUpperCase() || 'UPI'}
+                          {deal.payment_status === 'paid' ? '✓ PAID' : deal.payment_status === 'overdue' ? '⚠ OVERDUE' : '⏳ UNPAID'}
+                        </Badge>
+                        <p className="text-[10px] text-slate-400">
+                          Terms: {deal.credit_terms || 'Net 30'} · {String(deal.payment_method || 'CASH').toUpperCase()}
                         </p>
                       </div>
                     </td>
 
-                    {/* Delivery & Fulfillment */}
+                    {/* Interactive Delivery Fulfillment Status */}
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-1.5">
+                      <div className="space-y-1">
                         <select
                           value={deal.delivery_status || 'pending'}
                           onChange={(e) => updateDeliveryStatus(deal, e.target.value)}
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded-lg tracking-wider border cursor-pointer focus:outline-none transition-all ${
+                          className={`text-xs font-bold py-1 px-2.5 rounded-xl border transition-all cursor-pointer ${
                             deal.delivery_status === 'delivered'
-                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                               : deal.delivery_status === 'out_for_delivery'
-                              ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30'
-                              : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30'
+                              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
                           }`}
-                          title="Click to update delivery status"
                         >
                           <option value="pending">⏳ Pending Dispatch</option>
                           <option value="out_for_delivery">🚚 Out for Delivery</option>
                           <option value="delivered">✅ Delivered</option>
                         </select>
+                        <p className="text-[9px] text-slate-400">
+                          {deal.delivery_status === 'delivered' ? 'Completed & Handed Over' : deal.delivery_status === 'out_for_delivery' ? 'Driver in Transit' : 'Awaiting Dispatch'}
+                        </p>
                       </div>
                     </td>
 
                     {/* Invoice Amount */}
                     <td className="py-3 px-4">
-                      <p className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">{deal.formattedAmount}</p>
-                      <p className="text-[10px] text-slate-400">Incl. CGST/SGST 18%</p>
+                      <p className="font-bold text-indigo-600 dark:text-indigo-400 font-mono text-sm">
+                        {deal.formattedAmount}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {deal.tax_amount ? `Incl. GST ₹${Number(deal.tax_amount).toLocaleString('en-IN')}` : 'Incl. CGST/SGST 18%'}
+                      </p>
                     </td>
 
-                    {/* Items / Volume */}
+                    {/* Items & Date */}
                     <td className="py-3 px-4">
-                      <p className="font-semibold text-slate-700 dark:text-slate-300">{deal.item_count} Units</p>
-                      <p className="text-[10px] text-slate-400">{new Date(deal.occurred_at).toLocaleDateString()}</p>
+                      <p className="font-semibold text-slate-700 dark:text-slate-300">
+                        {deal.item_count || 1} Units
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {deal.occurred_at ? new Date(deal.occurred_at).toLocaleDateString('en-GB') : 'Today'}
+                      </p>
                     </td>
 
-                    {/* Actions */}
-                    <td className="py-3 px-4">
-                      <div className="flex justify-end items-center gap-1.5">
+                    {/* Commercial Actions */}
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         {isPendingPayment && (
                           <Button
                             variant="outline"
                             size="sm"
                             icon={CheckCircle2}
                             onClick={() => markAsPaid(deal)}
-                            className="text-[11px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                            title="Record Cash Collection / Clear Credit"
+                            className="text-emerald-500 hover:text-emerald-600"
+                            title="Mark as Cleared Payment"
                           >
                             Mark Paid
                           </Button>
@@ -785,7 +849,7 @@ export const SalesModule = () => {
                           size="sm"
                           icon={Printer}
                           onClick={() => openInvoiceModal(deal)}
-                          className="text-[11px] hover:border-indigo-500 hover:text-indigo-500"
+                          title="Generate Printable GST Invoice"
                         >
                           GST Invoice
                         </Button>
@@ -801,7 +865,12 @@ export const SalesModule = () => {
                           View
                         </Button>
                         {canUpdate && deal.status !== 'voided' && !deal.line_items?.length && (
-                          <Button variant="ghost" size="sm" icon={Pencil} onClick={() => openEdit(deal)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={Pencil}
+                            onClick={() => openEdit(deal)}
+                          >
                             Edit
                           </Button>
                         )}
@@ -814,6 +883,7 @@ export const SalesModule = () => {
                               setSelected(deal);
                               setModalMode('void');
                             }}
+                            className="text-rose-500 hover:text-rose-600"
                           >
                             Void
                           </Button>
@@ -851,17 +921,231 @@ export const SalesModule = () => {
         size="xl"
       >
         <form onSubmit={submitTransaction} className="space-y-4">
+          {modalMode === 'create' && (
+            /* Primary B2B Client Account Selection (Prominent Searchable Box at Top) */
+            <div className="space-y-2 rounded-2xl border-2 border-indigo-500/30 dark:border-indigo-500/40 p-4 bg-gradient-to-b from-indigo-50/60 to-white dark:from-indigo-950/30 dark:to-slate-900/60 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                    Select B2B Client / Retailer *
+                  </label>
+                </div>
+                {!isQuickAddClientOpen && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewClientForm((prev) => ({
+                        ...prev,
+                        company_name: clientSearchQuery || '',
+                        name: clientSearchQuery || '',
+                      }));
+                      setIsQuickAddClientOpen(true);
+                    }}
+                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 flex items-center gap-1.5 bg-white dark:bg-indigo-900/60 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-700 shadow-xs hover:shadow-md transition-all hover:scale-105"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>+ Add New Client</span>
+                  </button>
+                )}
+              </div>
+
+              {!isQuickAddClientOpen ? (
+                <div className="space-y-2">
+                  {/* Live Client Search Filter */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Type to search client by business name, phone, GSTIN, or city..."
+                      value={clientSearchQuery}
+                      onChange={(e) => setClientSearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-8 py-2 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800/80 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                    />
+                    {clientSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setClientSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Client Dropdown Select */}
+                  <select
+                    value={form.selectedCustomerId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const c = customers.find((cust) => cust.id === val);
+                      setForm({
+                        ...form,
+                        selectedCustomerId: val,
+                        customerReference: c ? (c.company_name || c.name) : '',
+                        creditTerms: c?.credit_terms || form.creditTerms
+                      });
+                    }}
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                  >
+                    <option value="">Walk-in / Direct Retail Counter Sale</option>
+                    {filteredCustomers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.company_name || c.name} · GSTIN: {c.gstin || 'Unregistered'} · City: {c.location || 'N/A'} · Route: {c.territory_route || 'Default'}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* If search query has no match or user wants to add */}
+                  {clientSearchQuery && filteredCustomers.length === 0 && (
+                    <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs flex items-center justify-between">
+                      <span className="text-amber-800 dark:text-amber-300">
+                        No existing client matching "<strong>{clientSearchQuery}</strong>"
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="primary"
+                        icon={UserPlus}
+                        onClick={() => {
+                          setNewClientForm((prev) => ({
+                            ...prev,
+                            company_name: clientSearchQuery,
+                            name: clientSearchQuery
+                          }));
+                          setIsQuickAddClientOpen(true);
+                        }}
+                      >
+                        Create "{clientSearchQuery}"
+                      </Button>
+                    </div>
+                  )}
+
+                  {selectedCustDetails && (
+                    <div className="p-2.5 rounded-xl bg-indigo-100/60 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-xs grid grid-cols-2 sm:grid-cols-4 gap-2 animate-fade-in">
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase font-semibold">Client Company</p>
+                        <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{selectedCustDetails.company_name || selectedCustDetails.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase font-semibold">GSTIN & Location</p>
+                        <p className="font-semibold text-slate-700 dark:text-slate-300 truncate">{selectedCustDetails.gstin || 'Unregistered'} · {selectedCustDetails.location || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase font-semibold">Credit Balance</p>
+                        <p className="font-bold text-amber-500">₹{Number(selectedCustDetails.outstanding_balance || 0).toLocaleString('en-IN')}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase font-semibold">Approved Limit</p>
+                        <p className="font-bold text-emerald-500">₹{Number(selectedCustDetails.credit_limit || 250000).toLocaleString('en-IN')}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Inline Quick Add Client Card */
+                <div className="space-y-3 p-3.5 rounded-xl border-2 border-indigo-500/40 bg-white dark:bg-slate-900/80 shadow-md animate-fade-in">
+                  <div className="flex items-center justify-between pb-2 border-b border-indigo-100 dark:border-indigo-900/50">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="w-4 h-4 text-indigo-500" />
+                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                        Quick Register New B2B Client
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickAddClientOpen(false)}
+                      className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-semibold"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <Input
+                      id="quickClientCompany"
+                      label="Company / Shop Name *"
+                      placeholder="e.g. Apex Wholesalers & Retail Pvt Ltd"
+                      value={newClientForm.company_name}
+                      onChange={(e) => setNewClientForm({ ...newClientForm, company_name: e.target.value, name: e.target.value })}
+                      required
+                    />
+                    <Input
+                      id="quickClientGstin"
+                      label="GSTIN Number"
+                      placeholder="e.g. 27AAAAA0000A1Z5"
+                      value={newClientForm.gstin}
+                      onChange={(e) => setNewClientForm({ ...newClientForm, gstin: e.target.value })}
+                    />
+                    <Input
+                      id="quickClientPhone"
+                      label="Contact Phone"
+                      placeholder="+91 98765 43210"
+                      value={newClientForm.contact_phone}
+                      onChange={(e) => setNewClientForm({ ...newClientForm, contact_phone: e.target.value })}
+                    />
+                    <Input
+                      id="quickClientLocation"
+                      label="Location / City / Address *"
+                      placeholder="e.g. Surat Wholesale Market, Gujarat"
+                      value={newClientForm.location}
+                      onChange={(e) => setNewClientForm({ ...newClientForm, location: e.target.value })}
+                      required
+                    />
+                    <Input
+                      id="quickClientLimit"
+                      label="Approved Credit Limit (₹)"
+                      type="number"
+                      placeholder="250000"
+                      value={newClientForm.credit_limit}
+                      onChange={(e) => setNewClientForm({ ...newClientForm, credit_limit: e.target.value })}
+                    />
+                    <Input
+                      id="quickClientRoute"
+                      label="Territory Route"
+                      placeholder="e.g. North Commercial Hub"
+                      value={newClientForm.territory_route}
+                      onChange={(e) => setNewClientForm({ ...newClientForm, territory_route: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsQuickAddClientOpen(false)}
+                    >
+                      Back to Client List
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      icon={CheckCircle2}
+                      isLoading={isCreatingClient}
+                      onClick={handleQuickCreateClient}
+                    >
+                      Save & Select Client
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Invoice Reference & Date/Time Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               id="transactionReference"
-              label="Invoice / PO Reference"
-              placeholder="e.g. INV-2026-0089"
+              label="Invoice / PO Reference (Optional / Auto-generated)"
+              placeholder="e.g. INV-20260911-0089 (Leave blank to auto-generate)"
               value={form.externalReference}
               onChange={(event) => setForm({ ...form, externalReference: event.target.value })}
             />
             <Input
               id="transactionOccurredAt"
-              label="Invoice Date & Time"
+              label="Invoice Date & Time *"
               type="datetime-local"
               value={form.occurredAt}
               onChange={(event) => setForm({ ...form, occurredAt: event.target.value })}
@@ -869,195 +1153,44 @@ export const SalesModule = () => {
             />
           </div>
 
+          {/* Commercial Terms & Delivery Status Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+              Payment Method
+              <select
+                value={form.paymentMethod}
+                onChange={(event) => setForm({ ...form, paymentMethod: event.target.value })}
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900 font-medium"
+              >
+                <option value="upi">UPI / QR Code</option>
+                <option value="cash">Cash Counter</option>
+                <option value="bank_transfer">Bank Transfer (NEFT)</option>
+                <option value="other">Credit Ledger (Unpaid)</option>
+              </select>
+            </label>
+            <Input
+              id="transactionCreditTerms"
+              label="Credit Payment Terms"
+              value={form.creditTerms}
+              onChange={(e) => setForm({ ...form, creditTerms: e.target.value })}
+              placeholder="Net 30"
+            />
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+              Order Delivery Status
+              <select
+                value={form.deliveryStatus}
+                onChange={(e) => setForm({ ...form, deliveryStatus: e.target.value })}
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900 font-semibold"
+              >
+                <option value="pending">⏳ Pending Dispatch</option>
+                <option value="out_for_delivery">🚚 Out for Delivery</option>
+                <option value="delivered">✅ Delivered</option>
+              </select>
+            </label>
+          </div>
+
           {modalMode === 'create' ? (
             <>
-              {/* B2B Client Selector with Inline Quick Create Option */}
-              <div className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 bg-slate-50/50 dark:bg-slate-800/40">
-                {!isQuickAddClientOpen ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Select B2B Client Account
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setIsQuickAddClientOpen(true)}
-                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 transition-all hover:scale-105"
-                      >
-                        <UserPlus className="w-3.5 h-3.5" />
-                        <span>+ Add New Client</span>
-                      </button>
-                    </div>
-
-                    <select
-                      value={form.selectedCustomerId}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const c = customers.find((cust) => cust.id === val);
-                        setForm({
-                          ...form,
-                          selectedCustomerId: val,
-                          creditTerms: c?.credit_terms || form.creditTerms
-                        });
-                      }}
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 font-medium"
-                    >
-                      <option value="">Walk-in / Direct Retail Counter Sale</option>
-                      {(customers || []).map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.company_name || c.name} · GSTIN: {c.gstin || 'N/A'} · Loc: {c.location || 'N/A'} · Route: {c.territory_route || 'Default'}
-                        </option>
-                      ))}
-                    </select>
-
-                    {selectedCustDetails && (
-                      <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/50 text-xs grid grid-cols-2 sm:grid-cols-4 gap-2 animate-fade-in">
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase font-semibold">Client Company</p>
-                          <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{selectedCustDetails.company_name || selectedCustDetails.name}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase font-semibold">GSTIN & Location</p>
-                          <p className="font-semibold text-slate-700 dark:text-slate-300 truncate">{selectedCustDetails.gstin || 'Unregistered'} · {selectedCustDetails.location || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase font-semibold">Credit Balance</p>
-                          <p className="font-bold text-amber-500">₹{Number(selectedCustDetails.outstanding_balance || 0).toLocaleString('en-IN')}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase font-semibold">Approved Limit</p>
-                          <p className="font-bold text-emerald-500">₹{Number(selectedCustDetails.credit_limit || 250000).toLocaleString('en-IN')}</p>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  /* Inline Quick Add Client Card */
-                  <div className="space-y-3 p-3.5 rounded-xl border-2 border-indigo-500/40 bg-white dark:bg-slate-900/80 shadow-md animate-fade-in">
-                    <div className="flex items-center justify-between pb-2 border-b border-indigo-100 dark:border-indigo-900/50">
-                      <div className="flex items-center gap-2">
-                        <UserPlus className="w-4 h-4 text-indigo-500" />
-                        <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                          Quick Register New B2B Client
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsQuickAddClientOpen(false)}
-                        className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-semibold"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <Input
-                        id="quickClientCompany"
-                        label="Company / Shop Name *"
-                        placeholder="e.g. Apex Wholesalers & Retail Pvt Ltd"
-                        value={newClientForm.company_name}
-                        onChange={(e) => setNewClientForm({ ...newClientForm, company_name: e.target.value, name: e.target.value })}
-                        required
-                      />
-                      <Input
-                        id="quickClientGstin"
-                        label="GSTIN Number"
-                        placeholder="e.g. 27AAAAA0000A1Z5"
-                        value={newClientForm.gstin}
-                        onChange={(e) => setNewClientForm({ ...newClientForm, gstin: e.target.value })}
-                      />
-                      <Input
-                        id="quickClientPhone"
-                        label="Contact Phone"
-                        placeholder="+91 98765 43210"
-                        value={newClientForm.contact_phone}
-                        onChange={(e) => setNewClientForm({ ...newClientForm, contact_phone: e.target.value })}
-                      />
-                      <Input
-                        id="quickClientLocation"
-                        label="Location / City / Address *"
-                        placeholder="e.g. Surat Wholesale Market, Gujarat"
-                        value={newClientForm.location}
-                        onChange={(e) => setNewClientForm({ ...newClientForm, location: e.target.value })}
-                        required
-                      />
-                      <Input
-                        id="quickClientLimit"
-                        label="Approved Credit Limit (₹)"
-                        type="number"
-                        placeholder="250000"
-                        value={newClientForm.credit_limit}
-                        onChange={(e) => setNewClientForm({ ...newClientForm, credit_limit: e.target.value })}
-                      />
-                      <Input
-                        id="quickClientRoute"
-                        label="Territory Route"
-                        placeholder="e.g. North Commercial Hub"
-                        value={newClientForm.territory_route}
-                        onChange={(e) => setNewClientForm({ ...newClientForm, territory_route: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsQuickAddClientOpen(false)}
-                      >
-                        Back to Client List
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="primary"
-                        size="sm"
-                        icon={CheckCircle2}
-                        isLoading={isCreatingClient}
-                        onClick={handleQuickCreateClient}
-                      >
-                        Save & Select Client
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Commercial Terms & Delivery Status Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                    Payment Method
-                    <select
-                      value={form.paymentMethod}
-                      onChange={(event) => setForm({ ...form, paymentMethod: event.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900"
-                    >
-                      <option value="upi">UPI / QR Code</option>
-                      <option value="cash">Cash Counter</option>
-                      <option value="bank_transfer">Bank Transfer (NEFT)</option>
-                      <option value="other">Credit Ledger (Unpaid)</option>
-                    </select>
-                  </label>
-                  <Input
-                    id="transactionCreditTerms"
-                    label="Credit Payment Terms"
-                    value={form.creditTerms}
-                    onChange={(e) => setForm({ ...form, creditTerms: e.target.value })}
-                    placeholder="Net 30"
-                  />
-                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                    Order Delivery Status
-                    <select
-                      value={form.deliveryStatus}
-                      onChange={(e) => setForm({ ...form, deliveryStatus: e.target.value })}
-                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900 font-semibold"
-                    >
-                      <option value="pending">⏳ Pending Dispatch</option>
-                      <option value="out_for_delivery">🚚 Out for Delivery</option>
-                      <option value="delivered">✅ Delivered</option>
-                    </select>
-                  </label>
-                </div>
-              </div>
-
               {/* Product Line Items */}
               <div className="space-y-3 rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
                 <div className="flex items-center justify-between">

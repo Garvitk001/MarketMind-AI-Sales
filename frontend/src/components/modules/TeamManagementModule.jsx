@@ -74,6 +74,7 @@ export const TeamManagementModule = () => {
   const [selected, setSelected] = useState(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [invitationToken, setInvitationToken] = useState('');
+  const [invitationDetails, setInvitationDetails] = useState({ token: '', email: '', fullName: '' });
   const [pendingAction, setPendingAction] = useState(null);
   const [password, setPassword] = useState('');
   const [saving, setSaving] = useState(false);
@@ -221,9 +222,14 @@ export const TeamManagementModule = () => {
         }),
       });
       setInvitationToken(result.token || '');
+      setInvitationDetails({
+        token: result.token || '',
+        email: invite.email.trim().toLowerCase(),
+        fullName: invite.fullName.trim()
+      });
       setIsInviteOpen(false);
       setInvite({ fullName: '', email: '', confirmEmail: '', roleCode: 'sales_executive', storeId: '' });
-      addToast(result.message, 'success');
+      addToast(result.message || 'Invitation created and activation email dispatched!', 'success');
     });
   };
 
@@ -253,6 +259,11 @@ export const TeamManagementModule = () => {
       const result = await api(`/users/${employee.employee_id}/invitation-token`);
       if (result.token) {
         setInvitationToken(result.token);
+        setInvitationDetails({
+          token: result.token,
+          email: employee.email,
+          fullName: employee.full_name
+        });
         addToast(`Active invitation token retrieved for ${employee.full_name}`, 'success');
         return;
       }
@@ -270,8 +281,13 @@ export const TeamManagementModule = () => {
       });
       if (result.token) {
         setInvitationToken(result.token);
+        setInvitationDetails({
+          token: result.token,
+          email: employee.email,
+          fullName: employee.full_name
+        });
       }
-      addToast(result.message || 'Activation token generated successfully', 'success');
+      addToast(result.message || 'Fresh activation token generated and emailed successfully', 'success');
     });
   };
 
@@ -755,17 +771,23 @@ export const TeamManagementModule = () => {
       <Modal
         isOpen={Boolean(invitationToken)}
         onClose={() => setInvitationToken('')}
-        title="Employee Account Activation Token"
+        title="Employee Account Activation & Security Token"
       >
         <div className="space-y-4">
           <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/40 p-4 border border-indigo-200 dark:border-indigo-800 space-y-2">
             <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 font-bold text-sm">
               <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-              <span>Invitation Token Ready</span>
+              <span>Activation Email Dispatched &amp; Token Ready</span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300">
-              Share this one-time activation token with your employee so they can activate their account and set their password.
-            </p>
+            {invitationDetails.email ? (
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                An invitation email with activation instructions has been dispatched to <strong className="text-indigo-600 dark:text-indigo-400 font-mono">{invitationDetails.email}</strong>.
+              </p>
+            ) : (
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                Share this one-time activation token with your employee so they can activate their workspace account.
+              </p>
+            )}
           </div>
 
           <div>
@@ -778,21 +800,32 @@ export const TeamManagementModule = () => {
           </div>
 
           <div className="rounded-xl bg-slate-50 dark:bg-slate-800/40 p-3.5 border border-slate-200 dark:border-slate-700/60 text-xs space-y-2">
-            <p className="font-bold text-slate-900 dark:text-slate-100">How the employee logs in:</p>
+            <p className="font-bold text-slate-900 dark:text-slate-100">How the employee activates their account:</p>
             <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-300">
               <li>Open the MarketMind Sign-In page.</li>
               <li>Click <span className="font-semibold text-indigo-500">"Have an employee invitation token? Activate your account"</span>.</li>
-              <li>Paste this token and choose their account password.</li>
-              <li>Instantly sign in with their email and new password!</li>
+              <li>Paste this token and set their personal password.</li>
+              <li>Instantly log in and start using MarketMind!</li>
             </ol>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
             <Button
               variant="outline"
               onClick={() => setInvitationToken('')}
             >
               Close
+            </Button>
+            <Button
+              variant="outline"
+              icon={Copy}
+              onClick={() => {
+                const text = `Hello ${invitationDetails.fullName || 'Team Member'},\n\nYou have been invited to join MarketMind. Use your one-time activation token below to activate your account:\n\nActivation Token: ${invitationToken}\n\nGo to the MarketMind Sign-In page, click 'Activate your account', enter this token, and set your password.`;
+                navigator.clipboard.writeText(text);
+                addToast('Full invitation message copied to clipboard!', 'success');
+              }}
+            >
+              Copy Full Invite
             </Button>
             <Button
               icon={Copy}
@@ -801,7 +834,7 @@ export const TeamManagementModule = () => {
                 addToast('Activation token copied to clipboard!', 'success');
               }}
             >
-              Copy Activation Token
+              Copy Token
             </Button>
           </div>
         </div>
