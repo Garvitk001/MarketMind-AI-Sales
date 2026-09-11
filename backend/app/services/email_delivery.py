@@ -126,13 +126,14 @@ def send_password_reset_email(*, recipient: str, full_name: str, token: str) -> 
 def send_verification_email(*, recipient: str, full_name: str, token: str) -> bool:
     return send_security_email(
         recipient=recipient,
-        subject="🔐 MarketMind Business Account Email Verification",
+        subject="🔐 Your MarketMind Registration Verification OTP",
         body=(
             f"Hello {full_name},\n\n"
-            "Thank you for registering with MarketMind!\n\n"
-            "To verify your email address and activate your store workspace, please enter this one-time verification token:\n\n"
+            "Thank you for registering your business workspace on MarketMind!\n\n"
+            "Your 6-digit One-Time Password (OTP) for account verification is:\n\n"
             f"👉  {token}  👈\n\n"
-            "This token will expire in 30 minutes. Your workspace will remain active once verified.\n\n"
+            "Please enter this 6-digit OTP code in the verification popup to confirm your email address and activate your account.\n\n"
+            "This OTP is valid for 30 minutes.\n\n"
             "— MarketMind System Security"
         ),
     )

@@ -119,6 +119,7 @@ def register(payload: RegisterRequest, request: Request, db: DBSession):
         db,
         user=user,
         purpose=SecurityTokenPurpose.EMAIL_VERIFICATION,
+        is_otp=True,
     )
     email_sent = False
     try:
@@ -128,24 +129,20 @@ def register(payload: RegisterRequest, request: Request, db: DBSession):
     except Exception:
         email_sent = False
 
-    if not email_sent:
-        # If email delivery is not configured, automatically activate the owner account
-        user.status = UserStatus.ACTIVE
-        user.email_verified_at = utcnow()
-
     record_audit(
         db,
         event_type="auth.registered",
         request=request,
         tenant_id=tenant.id,
         actor_user_id=user.id,
+        details={"email": user.email, "email_sent": email_sent},
     )
     db.commit()
     return DevelopmentTokenResponse(
         message=(
-            "Registration succeeded. Check your email for the verification token."
+            f"Registration successful! A 6-digit verification OTP has been sent to {user.email}."
             if email_sent
-            else "Registration succeeded! Your business account is active and ready to sign in."
+            else f"Registration successful! Please enter the 6-digit OTP sent to {user.email} to activate your workspace."
         ),
         token=token if settings.expose_development_tokens and not settings.is_production else None,
     )
@@ -168,17 +165,62 @@ def verify_email(payload: TokenRequest, request: Request, db: DBSession):
             request=request,
             tenant_id=user.tenant_id,
             actor_user_id=user.id,
+            details={"email": user.email},
         )
         db.commit()
     except HTTPException as exc:
-        # If token is not found or already consumed, check if it's a 6-digit code or if user is already active
-        if len(token_str) == 6 and token_str.isdigit():
-            # Treat valid 6-digit OTP confirmation
-            pass
-        else:
-            raise exc
+        raise exc
 
     return MessageResponse(message="Email address verified successfully. You can now log in.")
+
+
+@router.post("/resend-verification-otp", response_model=DevelopmentTokenResponse)
+def resend_verification_otp(payload: EmailOtpRequest, request: Request, db: DBSession):
+    rate_limiter.check_rate_limit(request, tier="auth")
+    if not payload.email:
+        raise HTTPException(status_code=400, detail="Target email address is required")
+    rate_limiter.check_auth_backoff(request, payload.email)
+    user = find_user_by_email(db, payload.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found with this email address")
+    if user.email_verified_at and user.status == UserStatus.ACTIVE:
+        return DevelopmentTokenResponse(
+            message="Your account is already active and verified. You can log in directly.",
+            token=None,
+        )
+
+    token = issue_security_token(
+        db,
+        user=user,
+        purpose=SecurityTokenPurpose.EMAIL_VERIFICATION,
+        is_otp=True,
+    )
+    email_sent = False
+    try:
+        email_sent = send_verification_email(
+            recipient=user.email, full_name=user.full_name, token=token
+        )
+    except Exception:
+        email_sent = False
+
+    record_audit(
+        db,
+        event_type="auth.verification_otp_resent",
+        request=request,
+        tenant_id=user.tenant_id,
+        actor_user_id=user.id,
+        details={"recipient": user.email, "email_sent": email_sent},
+    )
+    db.commit()
+
+    return DevelopmentTokenResponse(
+        message=(
+            f"A fresh 6-digit OTP has been sent to {user.email}."
+            if email_sent
+            else f"A fresh 6-digit verification OTP has been generated for {user.email}."
+        ),
+        token=token if settings.expose_development_tokens and not settings.is_production else None,
+    )
 
 
 @router.post("/login", response_model=TokenPair)

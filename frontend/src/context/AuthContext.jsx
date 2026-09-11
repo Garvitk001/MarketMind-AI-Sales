@@ -112,6 +112,12 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ token })
     });
 
+  const resendVerificationOtp = (email) =>
+    request('/auth/resend-verification-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+
   const acceptInvitation = ({ token, password }) =>
     request('/users/accept-invitation', {
       method: 'POST',
@@ -245,6 +251,7 @@ export const AuthProvider = ({ children }) => {
     api,
     register,
     verifyEmail,
+    resendVerificationOtp,
     acceptInvitation,
     requestPasswordReset,
     confirmPasswordReset,

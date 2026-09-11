@@ -31,6 +31,7 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
     requestDeveloperOtp,
     register,
     verifyEmail,
+    resendVerificationOtp,
     acceptInvitation,
     requestPasswordReset,
     confirmPasswordReset
@@ -68,6 +69,9 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
   const [resetPassword, setResetPassword] = useState('');
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [verifyToken, setVerifyToken] = useState('');
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const [isResendingOtp, setIsResendingOtp] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isInvitationOpen, setIsInvitationOpen] = useState(false);
   const [invitationToken, setInvitationToken] = useState('');
@@ -83,6 +87,16 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
     }
     return () => clearInterval(timer);
   }, [otpCountdown]);
+
+  React.useEffect(() => {
+    let timer;
+    if (resendCountdown > 0) {
+      timer = setInterval(() => {
+        setResendCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCountdown]);
 
   React.useEffect(() => {
     try {
@@ -215,9 +229,11 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
           currency: 'INR',
           timezone: 'Asia/Kolkata'
         });
+        setRegisteredEmail(trimmedEmail);
         setVerifyToken(response?.token || '');
         setIsVerifyModalOpen(true);
-        addToast(response?.message || 'Account created! Enter the verification token / OTP to verify.', 'success');
+        setResendCountdown(30);
+        addToast(response?.message || `Registration successful! Enter the 6-digit OTP sent to ${trimmedEmail}.`, 'success');
       }
     } catch (error) {
       const errMsg = error.message || '';
@@ -228,6 +244,24 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    const targetEmail = registeredEmail || email.trim();
+    if (!targetEmail || isResendingOtp || resendCountdown > 0) return;
+    setIsResendingOtp(true);
+    try {
+      const response = await resendVerificationOtp(targetEmail);
+      addToast(response?.message || `New 6-digit OTP sent to ${targetEmail}`, 'info');
+      if (response?.token) {
+        setVerifyToken(response.token);
+      }
+      setResendCountdown(30);
+    } catch (err) {
+      addToast(err.message || 'Failed to resend verification OTP.', 'danger');
+    } finally {
+      setIsResendingOtp(false);
     }
   };
 
@@ -265,24 +299,38 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
 
   const handleVerifySubmit = async (e) => {
     e.preventDefault();
-    if (!verifyToken.trim()) return;
+    const cleanOtp = verifyToken.trim();
+    if (!cleanOtp) {
+      addToast('Please enter the 6-digit OTP sent to your email.', 'warning');
+      return;
+    }
+    if (cleanOtp.length !== 6 || !/^\d+$/.test(cleanOtp)) {
+      addToast('Please enter a valid 6-digit numeric OTP.', 'warning');
+      return;
+    }
     setIsVerifying(true);
     try {
-      const response = await verifyEmail(verifyToken.trim());
-      addToast(response?.message || 'Email verified successfully!', 'success');
+      const response = await verifyEmail(cleanOtp);
+      addToast(response?.message || 'Email verified successfully! You can now sign in.', 'success');
       setIsVerifyModalOpen(false);
       setAuthMode('login');
+      if (registeredEmail) {
+        setEmail(registeredEmail);
+      }
       setVerifyToken('');
       setFullName('');
       setBusinessName('');
       setStoreName('');
     } catch (error) {
-      if (error.message?.toLowerCase().includes('already') || error.message?.toLowerCase().includes('verified')) {
-        addToast('Account is active. Please log in.', 'success');
+      if (error.message?.toLowerCase().includes('already') || error.message?.toLowerCase().includes('active') || error.message?.toLowerCase().includes('verified')) {
+        addToast('Account is already verified and active! Please sign in.', 'success');
         setIsVerifyModalOpen(false);
         setAuthMode('login');
+        if (registeredEmail) {
+          setEmail(registeredEmail);
+        }
       } else {
-        addToast(error.message || 'Invalid verification token.', 'danger');
+        addToast(error.message || 'Invalid or expired 6-digit OTP. Please check your Gmail or click Resend.', 'danger');
       }
     } finally {
       setIsVerifying(false);
@@ -820,27 +868,73 @@ export const Login = ({ initialMode = 'login', initialRole = 'owner', isDevelope
       <Modal
         isOpen={isVerifyModalOpen}
         onClose={() => setIsVerifyModalOpen(false)}
-        title="Verify Email Address"
+        title="Verify Email with 6-Digit OTP"
       >
         <form onSubmit={handleVerifySubmit} className="space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            Paste the verification token sent to the registered email address. In development,
-            MarketMind fills this field automatically.
-          </p>
-          <Input
-            id="verifyToken"
-            label="Verification Token"
-            value={verifyToken}
-            onChange={(e) => setVerifyToken(e.target.value)}
-            icon={CheckCircle2}
-            required
-          />
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/50">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              We've dispatched a <strong className="text-indigo-600 dark:text-indigo-400 font-semibold">6-digit OTP</strong> code to{' '}
+              <strong className="text-slate-900 dark:text-white font-semibold underline">{registeredEmail || 'your email'}</strong>.
+              Enter it below to verify your email and activate your business workspace.
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+              6-Digit One-Time Password (OTP)
+            </label>
+            <div className="relative">
+              <input
+                id="verifyToken"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={verifyToken}
+                onChange={(e) => setVerifyToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="• • • • • •"
+                autoFocus
+                className="w-full text-center tracking-[0.5em] font-mono text-2xl font-bold py-3 px-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700 placeholder:tracking-[0.3em]"
+                required
+              />
+            </div>
+          </div>
+
+          {verifyToken && verifyToken.length === 6 && (
+            <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60">
+              <span className="flex items-center gap-1.5 font-medium">
+                <CheckCircle2 className="w-4 h-4" /> 6-digit OTP code ready
+              </span>
+              <span className="font-mono text-[11px] opacity-80">Click verify to activate</span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-1">
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={isResendingOtp || resendCountdown > 0}
+              className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50 disabled:no-underline flex items-center gap-1"
+            >
+              {isResendingOtp
+                ? 'Sending OTP...'
+                : resendCountdown > 0
+                ? `Resend OTP in ${resendCountdown}s`
+                : 'Didn’t receive OTP? Resend OTP'}
+            </button>
+
+            <span className="text-[11px] text-slate-600 dark:text-slate-300">Valid for 30 mins</span>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
             <Button type="button" variant="ghost" onClick={() => setIsVerifyModalOpen(false)}>
               Verify Later
             </Button>
-            <Button type="submit" variant="primary" isLoading={isVerifying}>
-              Confirm Email
+            <Button type="submit" variant="primary" isLoading={isVerifying} disabled={verifyToken.length !== 6}>
+              Verify OTP & Activate
             </Button>
           </div>
         </form>

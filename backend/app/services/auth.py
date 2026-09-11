@@ -34,7 +34,7 @@ def issue_security_token(
     is_otp: bool = False,
 ) -> str:
     import random
-    if is_otp or purpose == SecurityTokenPurpose.PASSWORD_RESET:
+    if is_otp or purpose in (SecurityTokenPurpose.PASSWORD_RESET, SecurityTokenPurpose.EMAIL_VERIFICATION):
         raw_token = f"{random.randint(100000, 999999)}"
     else:
         raw_token = random_token()
