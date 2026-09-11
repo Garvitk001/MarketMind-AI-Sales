@@ -9,8 +9,8 @@ from app.schemas.common import ORMModel
 
 class CustomerCreate(BaseModel):
     company_name: str
+    contact_phone: str
     gstin: str | None = None
-    contact_phone: str | None = None
     contact_email: str | None = None
     location: str | None = None
     credit_limit: Decimal | None = Decimal("250000.00")

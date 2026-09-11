@@ -99,6 +99,11 @@ export const DataProvider = ({ children }) => {
           .then((value) => { assign.salesTransactions = value.items || []; })
           .catch(() => { assign.salesTransactions = []; })
       );
+      requests.push(
+        api('/customers?limit=200')
+          .then((value) => { assign.customers = value.items || []; })
+          .catch(() => { assign.customers = []; })
+      );
     }
     if (modules.has('inventory')) {
       requests.push(
@@ -112,8 +117,8 @@ export const DataProvider = ({ children }) => {
           .catch(() => { assign.inventoryItems = []; })
       );
     }
-    if (modules.has('customer_segments')) {
-      const segmentModule = (access.modules || []).find((module) => module.code === 'customer_segments');
+    if (modules.has('customer_segments') || modules.has('customers')) {
+      const segmentModule = (access.modules || []).find((module) => module.code === 'customer_segments' || module.code === 'customers');
       requests.push(
         api('/customers/summary')
           .then((value) => { assign.customerSummary = value; })
@@ -124,7 +129,7 @@ export const DataProvider = ({ children }) => {
           .then((value) => { assign.customerSegmentSummary = value; })
           .catch(() => { assign.customerSegmentSummary = null; })
       );
-      if (segmentModule?.access !== 'summary') {
+      if (segmentModule?.access !== 'summary' || !assign.customers.length) {
         requests.push(
           api('/customers?limit=200')
             .then((value) => { assign.customers = value.items || []; })

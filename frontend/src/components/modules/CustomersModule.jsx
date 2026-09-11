@@ -18,7 +18,8 @@ import {
   Phone,
   Mail,
   MapPin,
-  Edit3
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
@@ -260,20 +261,30 @@ export const CustomersModule = () => {
     }
   };
 
+  const canDeleteClient = currentRole?.id === 'manager' || currentRole?.id === 'owner' || profile?.role?.code === 'store_manager' || profile?.role?.code === 'owner';
+
   const handleRegisterClient = async (e) => {
     e.preventDefault();
+    if (!newClientForm.companyName.trim()) {
+      addToast('Client Company Name is required.', 'danger');
+      return;
+    }
+    if (!newClientForm.contactPhone.trim() || newClientForm.contactPhone.trim().length < 7) {
+      addToast('Valid contact phone number is mandatory to register a client.', 'danger');
+      return;
+    }
     setIsRegistering(true);
 
     try {
       const payload = {
         company_name: newClientForm.companyName.trim(),
-        gstin: newClientForm.gstin.trim() || '27AAAAA0000A1Z5',
-        contact_phone: newClientForm.contactPhone.trim() || '+91 98765 43210',
-        contact_email: newClientForm.contactEmail.trim() || 'billing@partner.in',
+        gstin: newClientForm.gstin.trim() || null,
+        contact_phone: newClientForm.contactPhone.trim(),
+        contact_email: newClientForm.contactEmail.trim() || null,
         location: newClientForm.location.trim() || 'Central Commercial Market',
         credit_limit: Number(newClientForm.creditLimit) || 250000,
         credit_terms: newClientForm.creditTerms || 'Net 30',
-        territory_route: newClientForm.territoryRoute || 'Central Wholesale Route'
+        territory_route: newClientForm.territoryRoute.trim() || 'Central Commercial Route'
       };
 
       const savedCust = await api('/customers', {
@@ -284,7 +295,7 @@ export const CustomersModule = () => {
       const formatted = {
         ...savedCust,
         customer_id: savedCust.id,
-        segment_name: 'VIP Wholesale Buyer',
+        segment_name: 'Store customer',
         total_revenue: 0,
         order_count: 0,
         recency_days: 0,
@@ -332,6 +343,14 @@ export const CustomersModule = () => {
   const handleUpdateClient = async (e) => {
     e.preventDefault();
     if (!selected) return;
+    if (!editClientForm.companyName.trim()) {
+      addToast('Company Name is required.', 'danger');
+      return;
+    }
+    if (!editClientForm.contactPhone.trim() || editClientForm.contactPhone.trim().length < 7) {
+      addToast('Valid contact phone number is required.', 'danger');
+      return;
+    }
     setIsUpdatingClient(true);
 
     try {
@@ -375,6 +394,31 @@ export const CustomersModule = () => {
       addToast(err.message || 'Failed to update client profile.', 'danger');
     } finally {
       setIsUpdatingClient(false);
+    }
+  };
+
+  const handleDeleteClient = async (client) => {
+    if (!client) return;
+    const clientName = client.company_name || client.external_customer_id || 'this client';
+    const balance = Number(client.outstanding_balance || 0);
+    if (balance > 0) {
+      addToast(`Cannot delete client "${clientName}". Outstanding dues of ${money(balance)} must be cleared first.`, 'danger');
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to permanently delete client "${clientName}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const targetId = client.customer_id || client.id;
+      const res = await api(`/customers/${targetId}`, { method: 'DELETE' });
+      addToast(res.message || `Client "${clientName}" deleted successfully.`, 'success');
+      setSelected(null);
+      setInsight(null);
+      setItems((prev) => prev.filter((i) => (i.customer_id || i.id) !== targetId));
+      setTotal((t) => Math.max(0, t - 1));
+      refresh();
+    } catch (err) {
+      addToast(err.message || 'Failed to delete client.', 'danger');
     }
   };
 
@@ -778,14 +822,13 @@ export const CustomersModule = () => {
             <Input
               id="clientGstin"
               label="GSTIN Number"
-              placeholder="27AAAAA0000A1Z5"
+              placeholder="e.g. 27AAAAA0000A1Z5 (Optional)"
               value={newClientForm.gstin}
               onChange={(e) => setNewClientForm({ ...newClientForm, gstin: e.target.value })}
-              required
             />
             <Input
               id="clientPhone"
-              label="Contact Phone"
+              label="Contact Phone *"
               placeholder="+91 98765 43210"
               value={newClientForm.contactPhone}
               onChange={(e) => setNewClientForm({ ...newClientForm, contactPhone: e.target.value })}
@@ -798,14 +841,14 @@ export const CustomersModule = () => {
               id="clientEmail"
               label="Billing / Contact Email"
               type="email"
-              placeholder="billing@partner.in"
+              placeholder="contact@business.in"
               value={newClientForm.contactEmail}
               onChange={(e) => setNewClientForm({ ...newClientForm, contactEmail: e.target.value })}
             />
             <Input
               id="clientLocation"
-              label="Client Location / Address"
-              placeholder="e.g. Sector 18 Wholesale Market, Pune"
+              label="Client Location / Address *"
+              placeholder="e.g. Sector 18 Wholesale Market, Surat"
               value={newClientForm.location}
               onChange={(e) => setNewClientForm({ ...newClientForm, location: e.target.value })}
               required
@@ -854,11 +897,11 @@ export const CustomersModule = () => {
       </Modal>
 
       {/* Edit Client Info Modal */}
-      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit B2B Client Details">
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit B2B Client Details" zIndex="z-[70]">
         <form onSubmit={handleUpdateClient} className="space-y-4">
           <Input
             id="editCompanyName"
-            label="Client Company / Store Name"
+            label="Client Company / Store Name *"
             value={editClientForm.companyName}
             onChange={(e) => setEditClientForm({ ...editClientForm, companyName: e.target.value })}
             required
@@ -868,14 +911,17 @@ export const CustomersModule = () => {
             <Input
               id="editGstin"
               label="GSTIN Number"
+              placeholder="e.g. 27AAAAA0000A1Z5"
               value={editClientForm.gstin}
               onChange={(e) => setEditClientForm({ ...editClientForm, gstin: e.target.value })}
             />
             <Input
               id="editPhone"
-              label="Contact Phone"
+              label="Contact Phone *"
+              placeholder="+91 98765 43210"
               value={editClientForm.contactPhone}
               onChange={(e) => setEditClientForm({ ...editClientForm, contactPhone: e.target.value })}
+              required
             />
           </div>
 
@@ -884,12 +930,13 @@ export const CustomersModule = () => {
               id="editEmail"
               label="Billing / Contact Email"
               type="email"
+              placeholder="contact@business.in"
               value={editClientForm.contactEmail}
               onChange={(e) => setEditClientForm({ ...editClientForm, contactEmail: e.target.value })}
             />
             <Input
               id="editLocation"
-              label="Client Location / Address"
+              label="Client Location / Address *"
               placeholder="e.g. Bhiwandi Logistics Park, Mumbai"
               value={editClientForm.location}
               onChange={(e) => setEditClientForm({ ...editClientForm, location: e.target.value })}
@@ -1027,15 +1074,28 @@ export const CustomersModule = () => {
                 </div>
               </div>
 
-              <Button
-                variant="primary"
-                size="sm"
-                icon={Edit3}
-                onClick={() => handleOpenEditModal(selected)}
-                className="shadow-md text-xs font-semibold shrink-0"
-              >
-                {t('Edit Client Info')}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={Edit3}
+                  onClick={() => handleOpenEditModal(selected)}
+                  className="shadow-md text-xs font-semibold shrink-0"
+                >
+                  {t('Edit Client Info')}
+                </Button>
+                {canDeleteClient && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    icon={Trash2}
+                    onClick={() => handleDeleteClient(selected)}
+                    className="shadow-md text-xs font-semibold shrink-0"
+                  >
+                    Delete Client
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div

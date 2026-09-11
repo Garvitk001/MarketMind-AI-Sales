@@ -54,8 +54,9 @@ const emptyForm = () => ({
 
 export const SalesModule = () => {
   const { addToast } = useToast();
-  const { salesTransactions, customers = [], refresh } = useData();
+  const { salesTransactions, customers: contextCustomers = [], refresh } = useData();
   const { api, profile } = useAuth();
+  const [directClients, setDirectClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [deliveryFilter, setDeliveryFilter] = useState('all');
@@ -84,8 +85,34 @@ export const SalesModule = () => {
     gstin: '',
     credit_limit: '250000',
     credit_terms: 'Net 30',
-    territory_route: 'Central Market'
+    territory_route: 'Central Commercial Market'
   });
+
+  const loadDirectClients = async () => {
+    try {
+      const data = await api('/customers?limit=200');
+      if (Array.isArray(data)) {
+        setDirectClients(data);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  React.useEffect(() => {
+    loadDirectClients();
+  }, []);
+
+  const customers = useMemo(() => {
+    const map = new Map();
+    (contextCustomers || []).forEach((c) => {
+      if (c && c.id) map.set(c.id, c);
+    });
+    (directClients || []).forEach((c) => {
+      if (c && c.id) map.set(c.id, c);
+    });
+    return Array.from(map.values());
+  }, [contextCustomers, directClients]);
 
   const openInvoiceModal = (deal) => {
     setInvoiceTransaction(deal);
@@ -170,12 +197,117 @@ export const SalesModule = () => {
     const q = clientSearchQuery.toLowerCase().trim();
     return (customers || []).filter((c) => {
       const name = String(c.company_name || c.name || '').toLowerCase();
+      const extId = String(c.external_customer_id || '').toLowerCase();
       const phone = String(c.contact_phone || '').toLowerCase();
       const gstin = String(c.gstin || '').toLowerCase();
       const location = String(c.location || '').toLowerCase();
-      return name.includes(q) || phone.includes(q) || gstin.includes(q) || location.includes(q);
+      return name.includes(q) || extId.includes(q) || phone.includes(q) || gstin.includes(q) || location.includes(q);
     });
   }, [customers, clientSearchQuery]);
+
+  const selectedCustDetails = useMemo(() => {
+    return (customers || []).find((c) => c.id === form.selectedCustomerId) || null;
+  }, [customers, form.selectedCustomerId]);
+
+  const openCreate = async () => {
+    if (!canCreate) {
+      addToast('Your role or store assignment does not allow transaction creation.', 'danger');
+      return;
+    }
+    try {
+      setCatalog(await api('/sales/catalog'));
+      loadDirectClients();
+      setSelected(null);
+      const generatedRef = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      setForm({
+        ...emptyForm(),
+        externalReference: generatedRef,
+        occurredAt: new Date().toISOString().slice(0, 16),
+      });
+      setClientSearchQuery('');
+      setIsQuickAddClientOpen(false);
+      setModalMode('create');
+    } catch (error) {
+      addToast(error.message, 'danger');
+    }
+  };
+
+  const openEdit = (transaction) => {
+    setSelected(transaction);
+    setForm({
+      externalReference: transaction.external_reference || '',
+      occurredAt: new Date(transaction.occurred_at || Date.now()).toISOString().slice(0, 16),
+      currency: transaction.currency || 'INR',
+      totalAmount: String(transaction.total_amount || ''),
+      itemCount: String(transaction.item_count || '1'),
+      selectedCustomerId: transaction.customer_id || '',
+      customerReference: transaction.customer_reference || '',
+      paymentMethod: transaction.payment_method || 'upi',
+      paymentStatus: transaction.payment_status || 'paid',
+      deliveryStatus: transaction.delivery_status || 'pending',
+      creditTerms: transaction.credit_terms || 'Net 30',
+      notes: transaction.notes || '',
+      items: [{ productId: '', quantity: '1', unitPrice: '', discountAmount: '0' }],
+      autoCalculateTax: false,
+      orderDiscount: '0',
+      taxAmount: String(transaction.tax_amount || '0')
+    });
+    setModalMode('edit');
+  };
+
+  const handleQuickCreateClient = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!newClientForm.company_name.trim()) {
+      addToast('Company / Business Name is required.', 'danger');
+      return;
+    }
+    if (!newClientForm.contact_phone.trim() || newClientForm.contact_phone.trim().length < 7) {
+      addToast('Valid contact phone number is mandatory to register a client.', 'danger');
+      return;
+    }
+    setIsCreatingClient(true);
+    try {
+      const created = await api('/customers', {
+        method: 'POST',
+        body: JSON.stringify({
+          company_name: newClientForm.company_name.trim(),
+          name: newClientForm.name.trim() || newClientForm.company_name.trim(),
+          contact_phone: newClientForm.contact_phone.trim(),
+          contact_email: newClientForm.contact_email.trim() || null,
+          location: newClientForm.location.trim() || 'Central Commercial Market',
+          gstin: newClientForm.gstin.trim() || null,
+          credit_limit: Number(newClientForm.credit_limit || 250000),
+          credit_terms: newClientForm.credit_terms || 'Net 30',
+          territory_route: newClientForm.territory_route.trim() || 'Central Commercial Market'
+        })
+      });
+      addToast(`B2B Client "${created.company_name || created.name}" created and selected!`, 'success');
+      setDirectClients((prev) => [created, ...prev.filter((c) => c.id !== created.id)]);
+      await refresh();
+      setForm((prev) => ({
+        ...prev,
+        selectedCustomerId: created.id,
+        customerReference: created.company_name || created.name,
+        creditTerms: created.credit_terms || prev.creditTerms
+      }));
+      setIsQuickAddClientOpen(false);
+      setNewClientForm({
+        company_name: '',
+        name: '',
+        contact_phone: '',
+        contact_email: '',
+        location: '',
+        gstin: '',
+        credit_limit: '250000',
+        credit_terms: 'Net 30',
+        territory_route: 'Central Commercial Market'
+      });
+    } catch (err) {
+      addToast(err.message || 'Failed to create new client', 'danger');
+    } finally {
+      setIsCreatingClient(false);
+    }
+  };
 
   const filteredDeals = deals.filter((deal) => {
     const customerObj = (customers || []).find((c) => c.id === deal.customer_id);
@@ -249,99 +381,6 @@ export const SalesModule = () => {
     };
   }, [form.items, form.orderDiscount, form.taxAmount, form.autoCalculateTax]);
 
-  const openCreate = async () => {
-    if (!canCreate) {
-      addToast('Your role or store assignment does not allow transaction creation.', 'danger');
-      return;
-    }
-    try {
-      setCatalog(await api('/sales/catalog'));
-      setSelected(null);
-      const generatedRef = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-      setForm({
-        ...emptyForm(),
-        externalReference: generatedRef,
-        occurredAt: new Date().toISOString().slice(0, 16),
-      });
-      setClientSearchQuery('');
-      setIsQuickAddClientOpen(false);
-      setModalMode('create');
-    } catch (error) {
-      addToast(error.message, 'danger');
-    }
-  };
-
-  const openEdit = (transaction) => {
-    setSelected(transaction);
-    setForm({
-      externalReference: transaction.external_reference || '',
-      occurredAt: new Date(transaction.occurred_at || Date.now()).toISOString().slice(0, 16),
-      currency: transaction.currency || 'INR',
-      totalAmount: String(transaction.total_amount || ''),
-      itemCount: String(transaction.item_count || '1'),
-      selectedCustomerId: transaction.customer_id || '',
-      customerReference: transaction.customer_reference || '',
-      paymentMethod: transaction.payment_method || 'upi',
-      paymentStatus: transaction.payment_status || 'paid',
-      deliveryStatus: transaction.delivery_status || 'pending',
-      creditTerms: transaction.credit_terms || 'Net 30',
-      notes: transaction.notes || '',
-      items: [{ productId: '', quantity: '1', unitPrice: '', discountAmount: '0' }],
-      autoCalculateTax: false,
-      orderDiscount: '0',
-      taxAmount: String(transaction.tax_amount || '0')
-    });
-    setModalMode('edit');
-  };
-
-  const handleQuickCreateClient = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (!newClientForm.company_name.trim()) {
-      addToast('Company Name is required', 'danger');
-      return;
-    }
-    setIsCreatingClient(true);
-    try {
-      const created = await api('/customers', {
-        method: 'POST',
-        body: JSON.stringify({
-          company_name: newClientForm.company_name.trim(),
-          name: newClientForm.name.trim() || newClientForm.company_name.trim(),
-          contact_phone: newClientForm.contact_phone.trim() || null,
-          contact_email: newClientForm.contact_email.trim() || null,
-          location: newClientForm.location.trim() || null,
-          gstin: newClientForm.gstin.trim() || null,
-          credit_limit: Number(newClientForm.credit_limit || 250000),
-          credit_terms: newClientForm.credit_terms || 'Net 30',
-          territory_route: newClientForm.territory_route.trim() || 'Central Wholesale Route'
-        })
-      });
-      addToast(`B2B Client "${created.company_name || created.name}" created and selected!`, 'success');
-      await refresh();
-      setForm((prev) => ({
-        ...prev,
-        selectedCustomerId: created.id,
-        creditTerms: created.credit_terms || prev.creditTerms
-      }));
-      setIsQuickAddClientOpen(false);
-      setNewClientForm({
-        company_name: '',
-        name: '',
-        contact_phone: '',
-        contact_email: '',
-        location: '',
-        gstin: '',
-        credit_limit: '250000',
-        credit_terms: 'Net 30',
-        territory_route: 'Central Market'
-      });
-    } catch (err) {
-      addToast(err.message || 'Failed to create new client', 'danger');
-    } finally {
-      setIsCreatingClient(false);
-    }
-  };
-
   const updateDeliveryStatus = async (deal, newStatus) => {
     setIsSaving(true);
     try {
@@ -384,6 +423,11 @@ export const SalesModule = () => {
     setIsSaving(true);
     try {
       if (modalMode === 'create') {
+        if (!form.selectedCustomerId) {
+          addToast('Please select or register a B2B client before generating the invoice.', 'danger');
+          setIsSaving(false);
+          return;
+        }
         if (!form.items.length) {
           addToast('Please add at least one line item.', 'danger');
           setIsSaving(false);
@@ -409,21 +453,21 @@ export const SalesModule = () => {
       }
 
       const selectedCust = customers.find((c) => c.id === form.selectedCustomerId);
-      const custRef = selectedCust ? (selectedCust.company_name || selectedCust.name) : form.customerReference.trim();
+      const custRef = selectedCust ? (selectedCust.company_name || selectedCust.name) : (form.customerReference ? form.customerReference.trim() : null);
 
       const payload = {
-        external_reference: form.externalReference.trim() || null,
+        external_reference: form.externalReference ? form.externalReference.trim() : null,
         occurred_at: new Date(form.occurredAt).toISOString(),
         total_amount: Number(orderSummary.total || form.totalAmount),
         item_count: Number(orderSummary.quantity || form.itemCount),
-        notes: form.notes.trim() || null
+        notes: form.notes ? form.notes.trim() : null
       };
 
       if (modalMode === 'create') {
         await api('/sales/transactions', {
           method: 'POST',
           body: JSON.stringify({
-            external_reference: form.externalReference.trim() || undefined,
+            external_reference: form.externalReference ? form.externalReference.trim() : undefined,
             occurred_at: new Date(form.occurredAt).toISOString(),
             store_id: profile?.store_id || undefined,
             currency: (form.currency || 'INR').toUpperCase(),
@@ -435,7 +479,7 @@ export const SalesModule = () => {
             credit_terms: form.creditTerms || 'Net 30',
             order_discount: Number(form.orderDiscount || 0),
             tax_amount: Number(orderSummary.tax),
-            notes: form.notes.trim() || undefined,
+            notes: form.notes ? form.notes.trim() : undefined,
             items: form.items.map((item) => ({
               product_id: item.productId,
               quantity: Number(item.quantity),
@@ -551,11 +595,6 @@ export const SalesModule = () => {
     }
     return null;
   };
-
-  const selectedCustDetails = useMemo(() => {
-    if (!form.selectedCustomerId) return null;
-    return customers.find((c) => c.id === form.selectedCustomerId);
-  }, [form.selectedCustomerId, customers]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -955,18 +994,18 @@ export const SalesModule = () => {
         title={modalMode === 'create' ? 'Generate Statutory B2B Tax Invoice' : 'Edit Sales Transaction'}
         size="xl"
       >
-        <form onSubmit={submitTransaction} className="space-y-4">
+        <form onSubmit={submitTransaction} className="space-y-5">
           {modalMode === 'create' && (
-            /* Primary B2B Client Account Selection (Prominent Searchable Box at Top) */
-            <div className="space-y-2 rounded-2xl border-2 border-indigo-500/30 dark:border-indigo-500/40 p-4 bg-gradient-to-b from-indigo-50/60 to-white dark:from-indigo-950/30 dark:to-slate-900/60 shadow-sm">
+            /* SECTION 1: B2B Client Selection & Profile */
+            <div className="space-y-3 rounded-2xl border-2 border-indigo-500/30 dark:border-indigo-500/40 p-4 bg-gradient-to-b from-indigo-50/50 via-white to-white dark:from-indigo-950/30 dark:via-slate-900/60 dark:to-slate-900/60 shadow-sm">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
-                    Select B2B Client / Retailer *
-                  </label>
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                    1. B2B Client Account Details *
+                  </span>
                 </div>
-                {!isQuickAddClientOpen && (
+                {!isQuickAddClientOpen && !selectedCustDetails && (
                   <button
                     type="button"
                     onClick={() => {
@@ -980,22 +1019,62 @@ export const SalesModule = () => {
                     className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 flex items-center gap-1.5 bg-white dark:bg-indigo-900/60 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-700 shadow-xs hover:shadow-md transition-all hover:scale-105"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
-                    <span>+ Add New Client</span>
+                    <span>+ Register New Client</span>
                   </button>
                 )}
               </div>
 
-              {!isQuickAddClientOpen ? (
+              {/* If Client is Selected: Show Detailed Selected Card */}
+              {selectedCustDetails ? (
+                <div className="p-3.5 rounded-xl bg-indigo-100/70 dark:bg-indigo-950/60 border border-indigo-300 dark:border-indigo-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-indigo-950 dark:text-indigo-100">
+                        {selectedCustDetails.company_name || selectedCustDetails.name}
+                      </span>
+                      {selectedCustDetails.gstin && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          GSTIN: {selectedCustDetails.gstin}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
+                      {selectedCustDetails.contact_phone && (
+                        <span className="font-medium text-slate-900 dark:text-slate-100">
+                          📞 {selectedCustDetails.contact_phone}
+                        </span>
+                      )}
+                      <span>📍 {selectedCustDetails.location || 'Central Commercial Market'}</span>
+                      <span>🚚 Route: {selectedCustDetails.territory_route || 'Central Route'}</span>
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">
+                        Due: ₹{Number(selectedCustDetails.outstanding_balance || 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setForm((prev) => ({ ...prev, selectedCustomerId: '', customerReference: '' }));
+                      setClientSearchQuery('');
+                    }}
+                    className="shrink-0 text-xs"
+                  >
+                    Change Client
+                  </Button>
+                </div>
+              ) : !isQuickAddClientOpen ? (
+                /* If No Client Selected: Show Search Bar and Client Selection List */
                 <div className="space-y-2">
-                  {/* Live Client Search Filter */}
                   <div className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Type to search client by business name, phone, GSTIN, or city..."
+                      placeholder="Type to search client by company name, phone (+91...), GSTIN, or city..."
                       value={clientSearchQuery}
                       onChange={(e) => setClientSearchQuery(e.target.value)}
-                      className="w-full pl-8 pr-8 py-2 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800/80 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                      className="w-full pl-9 pr-8 py-2 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800/80 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
                     />
                     {clientSearchQuery && (
                       <button
@@ -1008,77 +1087,72 @@ export const SalesModule = () => {
                     )}
                   </div>
 
-                  {/* Client Dropdown Select */}
-                  <select
-                    value={form.selectedCustomerId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const c = customers.find((cust) => cust.id === val);
-                      setForm({
-                        ...form,
-                        selectedCustomerId: val,
-                        customerReference: c ? (c.company_name || c.name) : '',
-                        creditTerms: c?.credit_terms || form.creditTerms
-                      });
-                    }}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-                  >
-                    <option value="">Walk-in / Direct Retail Counter Sale</option>
-                    {filteredCustomers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.company_name || c.name} · GSTIN: {c.gstin || 'Unregistered'} · City: {c.location || 'N/A'} · Route: {c.territory_route || 'Default'}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* If search query has no match or user wants to add */}
-                  {clientSearchQuery && filteredCustomers.length === 0 && (
-                    <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs flex items-center justify-between">
-                      <span className="text-amber-800 dark:text-amber-300">
-                        No existing client matching "<strong>{clientSearchQuery}</strong>"
-                      </span>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="primary"
-                        icon={UserPlus}
-                        onClick={() => {
-                          setNewClientForm((prev) => ({
-                            ...prev,
-                            company_name: clientSearchQuery,
-                            name: clientSearchQuery
-                          }));
-                          setIsQuickAddClientOpen(true);
-                        }}
-                      >
-                        Create "{clientSearchQuery}"
-                      </Button>
-                    </div>
-                  )}
-
-                  {selectedCustDetails && (
-                    <div className="p-2.5 rounded-xl bg-indigo-100/60 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-xs grid grid-cols-2 sm:grid-cols-4 gap-2 animate-fade-in">
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase font-semibold">Client Company</p>
-                        <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{selectedCustDetails.company_name || selectedCustDetails.name}</p>
+                  {/* Client Instant Selection List */}
+                  <div className="max-h-44 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800/60 shadow-inner">
+                    {filteredCustomers.length > 0 ? (
+                      filteredCustomers.map((c) => (
+                        <div
+                          key={c.id}
+                          onClick={() => {
+                            setForm({
+                              ...form,
+                              selectedCustomerId: c.id,
+                              customerReference: c.company_name || c.name,
+                              creditTerms: c?.credit_terms || form.creditTerms
+                            });
+                            setClientSearchQuery('');
+                          }}
+                          className="p-2.5 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/50 cursor-pointer transition-colors flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 dark:text-slate-100">
+                                {c.company_name || c.name}
+                              </span>
+                              {c.gstin && (
+                                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
+                                  {c.gstin}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-500 flex items-center gap-3">
+                              {c.contact_phone && <span>📞 {c.contact_phone}</span>}
+                              <span>📍 {c.location || 'Central Market'}</span>
+                              <span>🚚 {c.territory_route || 'Route 1'}</span>
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-semibold text-[11px]">
+                              Select Client →
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-4 text-center text-xs text-slate-500 space-y-2">
+                        <p>No existing client found matching "<strong>{clientSearchQuery}</strong>"</p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="primary"
+                          icon={UserPlus}
+                          onClick={() => {
+                            setNewClientForm((prev) => ({
+                              ...prev,
+                              company_name: clientSearchQuery,
+                              name: clientSearchQuery
+                            }));
+                            setIsQuickAddClientOpen(true);
+                          }}
+                        >
+                          Register "{clientSearchQuery}" as New Client
+                        </Button>
                       </div>
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase font-semibold">GSTIN & Location</p>
-                        <p className="font-semibold text-slate-700 dark:text-slate-300 truncate">{selectedCustDetails.gstin || 'Unregistered'} · {selectedCustDetails.location || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase font-semibold">Credit Balance</p>
-                        <p className="font-bold text-amber-500">₹{Number(selectedCustDetails.outstanding_balance || 0).toLocaleString('en-IN')}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase font-semibold">Approved Limit</p>
-                        <p className="font-bold text-emerald-500">₹{Number(selectedCustDetails.credit_limit || 250000).toLocaleString('en-IN')}</p>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               ) : (
-                /* Inline Quick Add Client Card */
+                /* Inline Quick Add Client Form */
                 <div className="space-y-3 p-3.5 rounded-xl border-2 border-indigo-500/40 bg-white dark:bg-slate-900/80 shadow-md animate-fade-in">
                   <div className="flex items-center justify-between pb-2 border-b border-indigo-100 dark:border-indigo-900/50">
                     <div className="flex items-center gap-2">
@@ -1100,9 +1174,17 @@ export const SalesModule = () => {
                     <Input
                       id="quickClientCompany"
                       label="Company / Shop Name *"
-                      placeholder="e.g. Apex Wholesalers & Retail Pvt Ltd"
+                      placeholder="e.g. Badshah Wholesale Traders"
                       value={newClientForm.company_name}
                       onChange={(e) => setNewClientForm({ ...newClientForm, company_name: e.target.value, name: e.target.value })}
+                      required
+                    />
+                    <Input
+                      id="quickClientPhone"
+                      label="Contact Phone *"
+                      placeholder="+91 98765 43210"
+                      value={newClientForm.contact_phone}
+                      onChange={(e) => setNewClientForm({ ...newClientForm, contact_phone: e.target.value })}
                       required
                     />
                     <Input
@@ -1111,13 +1193,6 @@ export const SalesModule = () => {
                       placeholder="e.g. 27AAAAA0000A1Z5"
                       value={newClientForm.gstin}
                       onChange={(e) => setNewClientForm({ ...newClientForm, gstin: e.target.value })}
-                    />
-                    <Input
-                      id="quickClientPhone"
-                      label="Contact Phone"
-                      placeholder="+91 98765 43210"
-                      value={newClientForm.contact_phone}
-                      onChange={(e) => setNewClientForm({ ...newClientForm, contact_phone: e.target.value })}
                     />
                     <Input
                       id="quickClientLocation"
@@ -1138,7 +1213,7 @@ export const SalesModule = () => {
                     <Input
                       id="quickClientRoute"
                       label="Territory Route"
-                      placeholder="e.g. North Commercial Hub"
+                      placeholder="e.g. Central Commercial Market"
                       value={newClientForm.territory_route}
                       onChange={(e) => setNewClientForm({ ...newClientForm, territory_route: e.target.value })}
                     />
@@ -1151,7 +1226,7 @@ export const SalesModule = () => {
                       size="sm"
                       onClick={() => setIsQuickAddClientOpen(false)}
                     >
-                      Back to Client List
+                      Cancel
                     </Button>
                     <Button
                       type="button"
@@ -1169,69 +1244,75 @@ export const SalesModule = () => {
             </div>
           )}
 
-          {/* Invoice Reference & Date/Time Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              id="transactionReference"
-              label="Invoice / PO Reference (Optional / Auto-generated)"
-              placeholder="e.g. INV-20260911-0089 (Leave blank to auto-generate)"
-              value={form.externalReference}
-              onChange={(event) => setForm({ ...form, externalReference: event.target.value })}
-            />
-            <Input
-              id="transactionOccurredAt"
-              label="Invoice Date & Time *"
-              type="datetime-local"
-              value={form.occurredAt}
-              onChange={(event) => setForm({ ...form, occurredAt: event.target.value })}
-              required
-            />
-          </div>
+          {/* SECTION 2: Invoice Metadata & Logistics */}
+          <div className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-900/40">
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              2. Invoice & Delivery Dispatch Settings
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                id="transactionReference"
+                label="Invoice / PO Reference"
+                placeholder="e.g. INV-20260911-0089 (Auto-generated)"
+                value={form.externalReference}
+                onChange={(event) => setForm({ ...form, externalReference: event.target.value })}
+              />
+              <Input
+                id="transactionOccurredAt"
+                label="Invoice Date & Time *"
+                type="datetime-local"
+                value={form.occurredAt}
+                onChange={(event) => setForm({ ...form, occurredAt: event.target.value })}
+                required
+              />
+            </div>
 
-          {/* Commercial Terms & Delivery Status Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-              Payment Method
-              <select
-                value={form.paymentMethod}
-                onChange={(event) => setForm({ ...form, paymentMethod: event.target.value })}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900 font-medium"
-              >
-                <option value="upi">UPI / QR Code</option>
-                <option value="cash">Cash Counter</option>
-                <option value="bank_transfer">Bank Transfer (NEFT)</option>
-                <option value="other">Credit Ledger (Unpaid)</option>
-              </select>
-            </label>
-            <Input
-              id="transactionCreditTerms"
-              label="Credit Payment Terms"
-              value={form.creditTerms}
-              onChange={(e) => setForm({ ...form, creditTerms: e.target.value })}
-              placeholder="Net 30"
-            />
-            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-              Order Delivery Status
-              <select
-                value={form.deliveryStatus}
-                onChange={(e) => setForm({ ...form, deliveryStatus: e.target.value })}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900 font-semibold"
-              >
-                <option value="pending">⏳ Pending Dispatch</option>
-                <option value="out_for_delivery">🚚 Out for Delivery</option>
-                <option value="delivered">✅ Delivered</option>
-              </select>
-            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                Payment Method
+                <select
+                  value={form.paymentMethod}
+                  onChange={(event) => setForm({ ...form, paymentMethod: event.target.value })}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900 font-medium"
+                >
+                  <option value="upi">UPI / QR Code</option>
+                  <option value="cash">Cash Counter</option>
+                  <option value="bank_transfer">Bank Transfer (NEFT)</option>
+                  <option value="other">Credit Ledger (Unpaid)</option>
+                </select>
+              </label>
+              <Input
+                id="transactionCreditTerms"
+                label="Payment Terms"
+                value={form.creditTerms}
+                onChange={(e) => setForm({ ...form, creditTerms: e.target.value })}
+                placeholder="Net 30"
+              />
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                Delivery Dispatch Status
+                <select
+                  value={form.deliveryStatus}
+                  onChange={(e) => setForm({ ...form, deliveryStatus: e.target.value })}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900 font-semibold"
+                >
+                  <option value="pending">⏳ Pending Dispatch</option>
+                  <option value="out_for_delivery">🚚 Out for Delivery</option>
+                  <option value="delivered">✅ Delivered</option>
+                </select>
+              </label>
+            </div>
           </div>
 
           {modalMode === 'create' ? (
             <>
-              {/* Product Line Items */}
-              <div className="space-y-3 rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+              {/* SECTION 3: Order Line Items & SKUs */}
+              <div className="space-y-3 rounded-2xl border border-slate-200 p-4 dark:border-slate-800 bg-white dark:bg-slate-900">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Order Line Items & SKUs</p>
-                    <p className="text-xs text-slate-500">Stock is validated and updated upon confirmation.</p>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      3. Order Line Items & Product SKUs
+                    </p>
+                    <p className="text-xs text-slate-500">Live inventory stock updated automatically upon confirmation.</p>
                   </div>
                   <Button type="button" size="sm" variant="outline" icon={PackagePlus} onClick={addLine}>
                     Add Line Item
@@ -1240,9 +1321,9 @@ export const SalesModule = () => {
                 {form.items.map((item, index) => {
                   const selectedProduct = catalog.find((product) => product.product_id === item.productId);
                   return (
-                    <div key={index} className="grid gap-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50 sm:grid-cols-12">
+                    <div key={index} className="grid gap-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50 sm:grid-cols-12 items-end">
                       <label className="text-xs font-semibold sm:col-span-5">
-                        Product / SKU
+                        Product / SKU *
                         <select
                           required
                           value={item.productId}
@@ -1256,7 +1337,7 @@ export const SalesModule = () => {
                               value={product.product_id}
                               disabled={form.items.some((line, lineIndex) => lineIndex !== index && line.productId === product.product_id)}
                             >
-                              {product.name} · {product.sku} · Stock: {product.available_stock}
+                              {product.name} · {product.sku} (Stock: {product.available_stock})
                             </option>
                           ))}
                         </select>
@@ -1266,7 +1347,7 @@ export const SalesModule = () => {
                       </label>
                       <div className="sm:col-span-2">
                         <Input
-                          label="Qty"
+                          label="Qty *"
                           type="number"
                           min="1"
                           max={selectedProduct?.available_stock || undefined}
@@ -1277,7 +1358,7 @@ export const SalesModule = () => {
                       </div>
                       <div className="sm:col-span-2">
                         <Input
-                          label="Unit Price (₹)"
+                          label="Unit Price (₹) *"
                           type="number"
                           min="0.01"
                           step="0.01"
@@ -1296,13 +1377,14 @@ export const SalesModule = () => {
                           onChange={(event) => updateLine(index, 'discountAmount', event.target.value)}
                         />
                       </div>
-                      <div className="flex items-end sm:col-span-1">
+                      <div className="flex justify-center sm:col-span-1 pb-1">
                         <Button
                           type="button"
                           variant="ghost"
                           icon={Trash2}
                           disabled={form.items.length === 1}
                           onClick={() => removeLine(index)}
+                          className="text-rose-500 hover:text-rose-600"
                         />
                       </div>
                     </div>
@@ -1310,51 +1392,56 @@ export const SalesModule = () => {
                 })}
               </div>
 
-              {/* Order Total & GST Calculation summary */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Input
-                  id="transactionDiscount"
-                  label="Order Discount (₹)"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.orderDiscount}
-                  onChange={(event) => setForm({ ...form, orderDiscount: event.target.value })}
-                />
-                <Input
-                  id="transactionTax"
-                  label="Tax GST (18%)"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={orderSummary.tax.toFixed(2)}
-                  disabled
-                />
-                <Input
-                  id="transactionCurrency"
-                  label="Currency"
-                  value={form.currency}
-                  onChange={(event) => setForm({ ...form, currency: event.target.value })}
-                  required
-                />
-              </div>
+              {/* SECTION 4: Financial Summary & Tax Calculation */}
+              <div className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-900/40">
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  4. Tax Ledger & Commercial Summary
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <Input
+                    id="transactionDiscount"
+                    label="Bill Discount (₹)"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.orderDiscount}
+                    onChange={(event) => setForm({ ...form, orderDiscount: event.target.value })}
+                  />
+                  <Input
+                    id="transactionTax"
+                    label="GST (18% Statutory)"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={orderSummary.tax.toFixed(2)}
+                    disabled
+                  />
+                  <Input
+                    id="transactionCurrency"
+                    label="Billing Currency"
+                    value={form.currency}
+                    onChange={(event) => setForm({ ...form, currency: event.target.value })}
+                    required
+                  />
+                </div>
 
-              <div className="grid grid-cols-3 gap-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 p-3.5 text-xs">
-                <div>
-                  <p className="text-slate-500">Total Units</p>
-                  <p className="font-bold text-sm text-slate-900 dark:text-slate-100">{orderSummary.quantity} Pcs</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Subtotal</p>
-                  <p className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                    ₹{orderSummary.subtotal.toLocaleString('en-IN')}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Final Invoice Total</p>
-                  <p className="font-bold text-sm text-indigo-600 dark:text-indigo-400">
-                    ₹{orderSummary.total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  </p>
+                <div className="grid grid-cols-3 gap-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 p-4 text-xs">
+                  <div>
+                    <p className="text-slate-500 uppercase font-semibold text-[10px]">Total Quantity</p>
+                    <p className="font-bold text-base text-slate-900 dark:text-slate-100">{orderSummary.quantity} Units</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase font-semibold text-[10px]">Taxable Subtotal</p>
+                    <p className="font-bold text-base text-slate-900 dark:text-slate-100">
+                      ₹{orderSummary.subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-indigo-600 dark:text-indigo-400 uppercase font-bold text-[10px]">Total Invoice Amount</p>
+                    <p className="font-extrabold text-lg text-indigo-600 dark:text-indigo-400">
+                      ₹{orderSummary.total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
                 </div>
               </div>
             </>
@@ -1405,17 +1492,18 @@ export const SalesModule = () => {
 
           <Input
             id="transactionNotes"
-            label="Notes / B2B Delivery Instructions"
+            label="Notes / Delivery Instructions"
+            placeholder="e.g. Fragile delivery, Gate #2 unloading instructions"
             value={form.notes}
             onChange={(event) => setForm({ ...form, notes: event.target.value })}
           />
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
             <Button type="button" variant="ghost" onClick={() => setModalMode(null)}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" isLoading={isSaving}>
-              Save Transaction
+              {modalMode === 'create' ? 'Generate Tax Invoice' : 'Save Changes'}
             </Button>
           </div>
         </form>

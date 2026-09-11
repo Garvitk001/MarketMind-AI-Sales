@@ -14,6 +14,7 @@ from app.models.customers import Customer
 from app.models.identity import RoleCode, Store, User
 from app.models.inventory import Product
 from app.models.sales import SalesLineItem, SalesTransaction, TransactionStatus
+from app.schemas.common import MessageResponse
 from app.schemas.customers import (
     CustomerCreate,
     CustomerInsightResponse,
@@ -101,6 +102,11 @@ def create_customer(
     db: DBSession,
     user: User = Depends(customer_reader),
 ):
+    if not payload.company_name or not payload.company_name.strip():
+        raise HTTPException(status_code=422, detail="Client company / shop name is required")
+    if not payload.contact_phone or not payload.contact_phone.strip():
+        raise HTTPException(status_code=422, detail="Contact phone number is mandatory to add a client")
+
     ext_id = f"CUST-{random.randint(1000, 9999)}"
     while db.scalar(
         select(Customer.id).where(
@@ -126,7 +132,7 @@ def create_customer(
         recency_days=0,
         company_name=payload.company_name.strip(),
         gstin=payload.gstin.strip() if payload.gstin else None,
-        contact_phone=payload.contact_phone.strip() if payload.contact_phone else None,
+        contact_phone=payload.contact_phone.strip(),
         contact_email=payload.contact_email.strip() if payload.contact_email else None,
         location=payload.location.strip() if payload.location else "Central Commercial Market",
         credit_limit=payload.credit_limit or Decimal("250000.00"),
@@ -178,6 +184,42 @@ def update_customer(
     db.commit()
     db.refresh(customer)
     return customer
+
+
+@router.delete("/{customer_id}", response_model=MessageResponse)
+def delete_customer(
+    customer_id: UUID,
+    db: DBSession,
+    user: User = Depends(customer_reader),
+):
+    # Only Store Manager, Owner, or Admin can delete client accounts
+    if user.role.code not in {RoleCode.STORE_MANAGER, RoleCode.OWNER, RoleCode.ADMIN}:
+        raise HTTPException(
+            status_code=403,
+            detail="Only Store Managers and Business Owners are permitted to delete client accounts.",
+        )
+
+    customer = db.scalar(
+        select(Customer).where(Customer.id == customer_id, Customer.tenant_id == user.tenant_id)
+    )
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    # Check if client has outstanding credit balance
+    if customer.outstanding_balance and customer.outstanding_balance > Decimal("0"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Cannot delete client '{customer.company_name or customer.external_customer_id}' with "
+                f"an outstanding balance of ₹{customer.outstanding_balance:.2f}. "
+                "All credit dues must be cleared first."
+            ),
+        )
+
+    client_name = customer.company_name or customer.external_customer_id
+    db.delete(customer)
+    db.commit()
+    return MessageResponse(message=f"Client '{client_name}' was successfully deleted.")
 
 
 @router.get("/{customer_id}/insights", response_model=CustomerInsightResponse)
