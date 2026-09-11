@@ -1349,30 +1349,35 @@ export const OwnerDashboard = ({ onNavigate }) => {
               ) : (
                 <div className="max-h-56 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                   {execLogs.map((log) => {
-                    const isBilling = log.category === 'billing' || log.category === 'sales';
-                    const isInventory = log.category === 'inventory';
+                    const title = (log.action_title || '').toLowerCase();
+                    const desc = (log.description || '').toLowerCase();
+                    const cat = (log.category || '').toLowerCase();
+
+                    let IconComponent = ShieldCheck;
+                    let iconStyle = 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400';
+
+                    if (title.includes('deliver') || desc.includes('deliver') || title.includes('dispatch') || desc.includes('dispatch')) {
+                      IconComponent = Truck;
+                      iconStyle = 'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400';
+                    } else if (title.includes('invoice') || title.includes('payment') || title.includes('paid') || desc.includes('payment') || desc.includes('paid') || cat === 'billing' || cat === 'sales') {
+                      IconComponent = FileText;
+                      iconStyle = 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400';
+                    } else if (title.includes('client') || title.includes('customer') || desc.includes('client') || desc.includes('customer') || cat === 'customer') {
+                      IconComponent = UserCheck;
+                      iconStyle = 'bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400';
+                    } else if (cat === 'inventory' || title.includes('stock') || title.includes('refill') || title.includes('product') || title.includes('po')) {
+                      IconComponent = Package;
+                      iconStyle = 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400';
+                    }
+
                     return (
                       <div
                         key={log.id}
                         className="p-3 rounded-xl bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 flex items-start justify-between gap-3 text-xs hover:border-indigo-400 dark:hover:border-indigo-600 transition"
                       >
                         <div className="flex items-start gap-2.5 min-w-0">
-                          <div
-                            className={`p-2 rounded-lg mt-0.5 shrink-0 ${
-                              isBilling
-                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
-                                : isInventory
-                                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
-                                : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400'
-                            }`}
-                          >
-                            {isBilling ? (
-                              <FileText className="w-3.5 h-3.5" />
-                            ) : isInventory ? (
-                              <Package className="w-3.5 h-3.5" />
-                            ) : (
-                              <ShieldCheck className="w-3.5 h-3.5" />
-                            )}
+                          <div className={`p-2 rounded-lg mt-0.5 shrink-0 ${iconStyle}`}>
+                            <IconComponent className="w-3.5 h-3.5" />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">

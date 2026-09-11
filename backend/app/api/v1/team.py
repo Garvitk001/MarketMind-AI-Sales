@@ -414,59 +414,128 @@ def get_employee_activity_logs(
         seen_ids.add(str(ev.id))
         ev_type = ev.event_type
         details = ev.details or {}
-        action_title = "User Activity Recorded"
-        description = f"Performed action: {ev_type}"
+        action_title = "Commercial Activity Recorded"
+        description = f"Action: {ev_type.replace('_', ' ').replace('.', ' → ').title()}"
         category = "security"
         badge_variant = "info"
         amount = None
 
         if ev_type == "sales.transaction_created":
-            action_title = "Generated B2B Bill / Invoice"
-            amount_str = details.get("amount")
-            amount = Decimal(str(amount_str)) if amount_str else None
-            description = f"Generated invoice (Ref: {ev.target_id or 'New Sale'})"
-            if amount:
-                description += f" for ₹{amount:,.2f}"
+            inv_num = details.get("invoice_number") or ev.target_id or "Invoice"
+            client_name = details.get("client_name") or "B2B Client"
+            amount_val = details.get("amount")
+            pay_stat = details.get("payment_status", "paid")
+            del_stat = details.get("delivery_status", "pending")
+            item_cnt = details.get("item_count", 1)
+            action_title = f"Generated Tax Invoice #{inv_num}"
+            amount = Decimal(str(amount_val)) if amount_val else None
+            description = f"Billed ₹{float(amount_val):,.2f} for {client_name} ({item_cnt} items • Payment: {pay_stat.title()} • Delivery: {del_stat.replace('_', ' ').title()})" if amount_val else f"Generated tax invoice for {client_name}"
             category = "billing"
             badge_variant = "success"
+
         elif ev_type == "sales.transaction_updated":
-            action_title = "Updated Bill / Marked Paid"
-            category = "billing"
-            badge_variant = "info"
-            description = "Updated invoice status / recorded payment terms"
+            inv_num = details.get("invoice_number", "")
+            del_stat = details.get("delivery_status")
+            pay_stat = details.get("payment_status")
+            amount_val = details.get("amount")
+            amount = Decimal(str(amount_val)) if amount_val else None
+
+            if del_stat:
+                del_formatted = del_stat.replace("_", " ").title()
+                action_title = f"Updated Delivery: {del_formatted}"
+                description = f"Marked delivery status as '{del_formatted}' for invoice #{inv_num or 'Order'}"
+                category = "billing"
+                badge_variant = "warning" if del_stat in ("out_for_delivery", "pending") else "success"
+            elif pay_stat:
+                pay_formatted = pay_stat.replace("_", " ").title()
+                action_title = f"Updated Payment: {pay_formatted}"
+                description = f"Recorded payment status update to '{pay_formatted}' for invoice #{inv_num or 'Order'}"
+                category = "billing"
+                badge_variant = "success" if pay_stat == "paid" else "warning"
+            else:
+                action_title = f"Updated Invoice #{inv_num or 'Record'}"
+                description = f"Modified invoice commercial terms and order parameters"
+                category = "billing"
+                badge_variant = "info"
+
         elif ev_type == "sales.transaction_voided":
-            action_title = "Voided Sales Transaction"
+            action_title = "Voided Sales Invoice"
+            description = f"Cancelled invoice and restored warehouse stock levels ({ev.target_id or ''})"
             category = "billing"
             badge_variant = "danger"
-            description = f"Voided and cancelled transaction record {ev.target_id or ''}"
+
+        elif ev_type == "customer.created":
+            comp = details.get("company_name", "New Client")
+            ph = details.get("contact_phone", "")
+            loc = details.get("location", "")
+            action_title = f"Registered Client: {comp}"
+            description = f"Added B2B account for {comp}" + (f" (Phone: {ph})" if ph else "") + (f" in {loc}" if loc else "")
+            category = "billing"
+            badge_variant = "success"
+
+        elif ev_type == "customer.updated":
+            comp = details.get("company_name", "Client Account")
+            bal = details.get("outstanding_balance")
+            action_title = f"Edited Client Info: {comp}"
+            description = f"Updated client profile details for {comp}" + (f" (Outstanding Balance: ₹{float(bal):,.2f})" if bal and float(bal) > 0 else "")
+            category = "billing"
+            badge_variant = "info"
+
+        elif ev_type == "customer.deleted":
+            comp = details.get("company_name", "Client")
+            action_title = f"Deleted Client: {comp}"
+            description = f"Removed client account {comp} (verified ₹0 outstanding dues)"
+            category = "billing"
+            badge_variant = "danger"
+
         elif ev_type == "inventory.created":
-            action_title = "Added Product / Inward Stock"
             sku = details.get("sku", "Product")
             name = details.get("name", "")
-            description = f"Added product '{name}' (SKU: {sku}) to store inventory"
+            action_title = f"Added Product: {name or sku}"
+            description = f"Cataloged product '{name}' (SKU: {sku}) to store inventory"
             category = "inventory"
             badge_variant = "success"
+
         elif ev_type == "inventory.updated":
-            action_title = "Updated Inventory & Stock Levels"
-            description = "Modified warehouse inventory quantities and parameters"
+            changes = details.get("changes", {})
+            qty = changes.get("stock_quantity")
+            action_title = "Refilled / Adjusted Stock Levels"
+            description = f"Modified warehouse inventory quantities and safety thresholds" + (f" (New Stock: {qty} units)" if qty else "")
             category = "inventory"
             badge_variant = "info"
+
         elif ev_type == "inventory.deleted":
-            action_title = "Deleted Product from Catalog"
             sku = details.get("sku", "")
             name = details.get("name", "")
-            description = f"Removed product '{name}' (SKU: {sku}) from inventory"
+            action_title = f"Deleted Product: {name or sku}"
+            description = f"Removed product '{name}' (SKU: {sku}) from catalog"
             category = "inventory"
             badge_variant = "warning"
-        elif ev_type == "auth.login":
-            action_title = "Employee Login Session"
-            description = "Authenticated to MarketMind commercial session"
+
+        elif ev_type in ("auth.login", "auth.login_succeeded"):
+            action_title = "Signed In to Workspace"
+            description = f"Authenticated commercial workspace session"
             category = "security"
             badge_variant = "info"
+
+        elif ev_type == "auth.logout":
+            action_title = "Signed Out of Workspace"
+            description = "Commercial session terminated securely"
+            category = "security"
+            badge_variant = "default"
+
+        elif ev_type == "auth.login_failed":
+            action_title = "Failed Login Attempt"
+            description = "Authentication challenge failed"
+            category = "security"
+            badge_variant = "danger"
+
         elif "target" in ev_type:
             action_title = "Sales Quota Target Event"
-            description = "Updated sales performance target"
-            category = "team"
+            metric = details.get("metric", "revenue")
+            t_val = details.get("target_value", "")
+            description = f"Sales performance {metric} target set to ₹{float(t_val):,.2f}" if t_val else "Updated sales performance target"
+            category = "billing"
             badge_variant = "info"
 
         activities.append(
@@ -491,12 +560,13 @@ def get_employee_activity_logs(
         if tx_id_str not in seen_ids and str(tx.id) not in seen_ids:
             seen_ids.add(tx_id_str)
             status_label = "Paid" if tx.payment_status == "paid" else "Unpaid / Credit"
+            del_label = (tx.delivery_status or "pending").replace("_", " ").title()
             activities.append(
                 EmployeeActivityItem(
                     id=tx_id_str,
-                    event_type="sales.bill_recorded",
-                    action_title=f"B2B Invoice {tx.external_reference or 'Generated'}",
-                    description=f"Generated bill for ₹{tx.total_amount:,.2f} ({tx.item_count} items, Status: {status_label})",
+                    event_type="sales.transaction_created",
+                    action_title=f"Generated Tax Invoice #{tx.external_reference or 'Sale'}",
+                    description=f"Billed ₹{tx.total_amount:,.2f} ({tx.item_count} items • Payment: {status_label} • Delivery: {del_label})",
                     category="billing",
                     target_type="sales_transaction",
                     target_id=str(tx.id),
@@ -505,6 +575,7 @@ def get_employee_activity_logs(
                     amount=tx.total_amount,
                     details={
                         "payment_status": tx.payment_status or "paid",
+                        "delivery_status": tx.delivery_status or "pending",
                         "external_reference": tx.external_reference,
                         "item_count": tx.item_count,
                     },

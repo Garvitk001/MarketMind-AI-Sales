@@ -105,6 +105,8 @@ def create_transaction(
     else:
         ext_ref = f"INV-{secrets.token_hex(6).upper()}"
 
+    customer = None
+    customer_snapshot = None
     try:
         if payload.items:
             product_ids = [line.product_id for line in payload.items]
@@ -307,6 +309,7 @@ def create_transaction(
             db.add(transaction)
             db.flush()
 
+        client_name = customer.company_name if customer else (payload.customer_reference or "B2B Client")
         record_audit(
             db,
             event_type="sales.transaction_created",
@@ -318,9 +321,12 @@ def create_transaction(
             details={
                 "amount": str(transaction.total_amount),
                 "currency": transaction.currency,
-                "products": len(payload.items),
-                "inventory_updated": bool(payload.items),
-                "customer_updated": bool(transaction.customer_id),
+                "invoice_number": transaction.external_reference,
+                "client_name": client_name,
+                "item_count": transaction.item_count,
+                "payment_status": transaction.payment_status or "paid",
+                "delivery_status": transaction.delivery_status or "pending",
+                "credit_terms": transaction.credit_terms or "Net 30",
             },
         )
         db.commit()
@@ -455,7 +461,13 @@ def update_transaction(
         actor_user_id=user.id,
         target_type="sales_transaction",
         target_id=str(item.id),
-        details={"before": before},
+        details={
+            "invoice_number": item.external_reference,
+            "payment_status": item.payment_status,
+            "delivery_status": item.delivery_status,
+            "amount": str(item.total_amount),
+            "before": before,
+        },
     )
     db.commit()
     db.refresh(item)

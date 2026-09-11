@@ -33,7 +33,10 @@ import {
   PackagePlus,
   Sparkles,
   PieChart as PieIcon,
-  Send
+  Send,
+  SlidersHorizontal,
+  XCircle,
+  Check
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -86,10 +89,22 @@ const getRecommendedReorderQty = (item) => {
 };
 
 export const ManagerDashboard = () => {
-  const { profile, api } = useAuth();
+  const { currentRole, profile, api } = useAuth();
   const { addToast } = useToast();
   const { t } = useLanguage();
-  const { inventorySummary, inventoryItems: liveInventoryItems, refresh, purchaseOrders = [], createPurchaseOrder, deletePurchaseOrder, salesTransactions = [] } = useData();
+  const {
+    inventorySummary,
+    inventoryItems: liveInventoryItems,
+    refresh,
+    purchaseOrders = [],
+    createPurchaseOrder,
+    updatePurchaseOrderStatus,
+    editAndApprovePurchaseOrder,
+    deletePurchaseOrder,
+    salesTransactions = []
+  } = useData();
+
+  const isOwner = currentRole?.id === 'owner' || profile?.role?.code === 'business_owner' || profile?.role_code === 'business_owner';
 
   const storeDeliveryStats = useMemo(() => {
     const deals = salesTransactions || [];
@@ -144,6 +159,58 @@ export const ManagerDashboard = () => {
   const [adjustmentType, setAdjustmentType] = useState('inward');
   const [adjustmentReason, setAdjustmentReason] = useState('Supplier Delivery Receipt');
   const [isAdjusting, setIsAdjusting] = useState(false);
+
+  // PO Approval / Rejection modal state
+  const [rejectingPo, setRejectingPo] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [editingPo, setEditingPo] = useState(null);
+  const [editPoForm, setEditPoForm] = useState({
+    quantity: '',
+    unit_price: '',
+    supplier_name: '',
+    owner_remarks: '',
+  });
+
+  const handleQuickApprove = (po) => {
+    updatePurchaseOrderStatus(po.id, 'approved', 'Approved by Business Owner');
+    addToast(`Purchase Order ${po.id} approved! Ready to receive stock.`, 'success');
+  };
+
+  const handleOpenRejectModal = (po) => {
+    setRejectingPo(po);
+    setRejectionReason('Budget threshold exceeded for this restocking cycle');
+  };
+
+  const handleConfirmReject = (e) => {
+    e?.preventDefault();
+    if (!rejectingPo) return;
+    updatePurchaseOrderStatus(rejectingPo.id, 'rejected', rejectionReason.trim());
+    addToast(`Purchase Order ${rejectingPo.id} rejected.`, 'info');
+    setRejectingPo(null);
+  };
+
+  const handleOpenEditPoModal = (po) => {
+    setEditingPo(po);
+    setEditPoForm({
+      quantity: String(po.quantity),
+      unit_price: String(po.unit_price),
+      supplier_name: po.supplier_name || 'Apex Wholesaler & FMCG Distributors',
+      owner_remarks: po.owner_remarks || 'Approved with adjusted quota by Business Owner',
+    });
+  };
+
+  const handleSaveEditAndApprove = (e) => {
+    e?.preventDefault();
+    if (!editingPo) return;
+    editAndApprovePurchaseOrder(editingPo.id, {
+      quantity: Number(editPoForm.quantity),
+      unit_price: Number(editPoForm.unit_price),
+      supplier_name: editPoForm.supplier_name.trim(),
+      owner_remarks: editPoForm.owner_remarks.trim(),
+    });
+    addToast(`Purchase Order ${editingPo.id} adjusted & approved!`, 'success');
+    setEditingPo(null);
+  };
 
   // Manual Product Management (Add, Edit, Delete)
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -1304,7 +1371,7 @@ export const ManagerDashboard = () => {
                     )}
                   </td>
                   <td className="p-3 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
+                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1325,6 +1392,61 @@ export const ManagerDashboard = () => {
                       >
                         CSV
                       </Button>
+
+                      {/* Business Owner Actions when status is pending_owner_approval */}
+                      {po.status === 'pending_owner_approval' && isOwner && (
+                        <>
+                          <Button
+                            variant="success"
+                            size="sm"
+                            icon={CheckCircle2}
+                            onClick={() => handleQuickApprove(po)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                            title="Approve Purchase Order"
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            icon={SlidersHorizontal}
+                            onClick={() => handleOpenEditPoModal(po)}
+                            className="text-xs text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-medium"
+                            title="Adjust Quantity & Approve"
+                          >
+                            Adjust
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            icon={XCircle}
+                            onClick={() => handleOpenRejectModal(po)}
+                            className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold"
+                            title="Reject Purchase Order"
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      )}
+
+                      {/* Store Manager Actions when status is pending_owner_approval */}
+                      {po.status === 'pending_owner_approval' && !isOwner && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Trash2}
+                          onClick={() => {
+                            deletePurchaseOrder(po.id);
+                            addToast(`Purchase Order ${po.id} cancelled.`, 'info');
+                          }}
+                          className="text-rose-500 hover:text-rose-600 text-xs"
+                          title={t('Cancel')}
+                        >
+                          {t('Cancel')}
+                        </Button>
+                      )}
+
+                      {/* Stock inward action once approved */}
                       {po.status === 'approved' && (
                         <Button
                           variant="primary"
@@ -1345,21 +1467,6 @@ export const ManagerDashboard = () => {
                           className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
                         >
                           {t('Receive Stock')}
-                        </Button>
-                      )}
-                      {po.status === 'pending_owner_approval' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon={Trash2}
-                          onClick={() => {
-                            deletePurchaseOrder(po.id);
-                            addToast(`Purchase Order ${po.id} cancelled.`, 'info');
-                          }}
-                          className="text-rose-500 hover:text-rose-600 text-xs"
-                          title={t('Cancel')}
-                        >
-                          {t('Cancel')}
                         </Button>
                       )}
                     </div>
@@ -1744,12 +1851,128 @@ export const ManagerDashboard = () => {
                 variant="danger"
                 icon={Trash2}
                 isLoading={isDeletingProduct}
-                onClick={handleDeleteProduct}
+                onClick={handleConfirmDeleteProduct}
               >
                 Delete Product
               </Button>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* Reject Purchase Order Modal */}
+      <Modal
+        isOpen={Boolean(rejectingPo)}
+        onClose={() => setRejectingPo(null)}
+        title={`Reject Purchase Order: ${rejectingPo?.id || ''}`}
+      >
+        {rejectingPo && (
+          <form onSubmit={handleConfirmReject} className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-1.5">
+              <p className="font-bold text-sm text-rose-200">
+                Are you sure you want to decline this restock request?
+              </p>
+              <p>
+                Product: <strong>{rejectingPo.item_name}</strong> • Requested Quantity:{' '}
+                <strong>{rejectingPo.quantity} units</strong> (₹{Number(rejectingPo.total_amount).toLocaleString('en-IN')})
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                Rejection Reason / Note to Store Manager
+              </label>
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={3}
+                required
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-xs text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-rose-500 outline-none"
+                placeholder="e.g. Budget threshold exceeded for this month, or alternate supplier quota active."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <Button type="button" variant="outline" onClick={() => setRejectingPo(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="danger" icon={XCircle}>
+                Confirm Rejection
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Edit & Approve Purchase Order Modal */}
+      <Modal
+        isOpen={Boolean(editingPo)}
+        onClose={() => setEditingPo(null)}
+        title={`Adjust & Authorize Purchase Order: ${editingPo?.id || ''}`}
+      >
+        {editingPo && (
+          <form onSubmit={handleSaveEditAndApprove} className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
+              <p className="font-bold text-amber-200">
+                Adjust procurement quota or supplier rate before approving this PO for store dispatch.
+              </p>
+              <p className="mt-1 text-slate-400">
+                Item: <strong>{editingPo.item_name}</strong> (SKU: {editingPo.item_sku})
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                id="editPoQty"
+                label="Approved Quantity (Units)"
+                type="number"
+                min="1"
+                value={editPoForm.quantity}
+                onChange={(e) => setEditPoForm({ ...editPoForm, quantity: e.target.value })}
+                required
+              />
+              <Input
+                id="editPoPrice"
+                label="Unit Procurement Rate (₹)"
+                type="number"
+                min="0"
+                step="0.01"
+                value={editPoForm.unit_price}
+                onChange={(e) => setEditPoForm({ ...editPoForm, unit_price: e.target.value })}
+                required
+              />
+            </div>
+
+            <Input
+              id="editPoSupplier"
+              label="Assigned Wholesaler / Supplier"
+              value={editPoForm.supplier_name}
+              onChange={(e) => setEditPoForm({ ...editPoForm, supplier_name: e.target.value })}
+              required
+            />
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                Owner Authorization Remarks
+              </label>
+              <textarea
+                value={editPoForm.owner_remarks}
+                onChange={(e) => setEditPoForm({ ...editPoForm, owner_remarks: e.target.value })}
+                rows={2}
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-xs text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder="e.g. Approved with adjusted 100 units quota."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <Button type="button" variant="outline" onClick={() => setEditingPo(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" icon={CheckCircle2} className="bg-emerald-600 hover:bg-emerald-700">
+                Authorize &amp; Dispatch PO
+              </Button>
+            </div>
+          </form>
         )}
       </Modal>
     </div>

@@ -26,6 +26,7 @@ from app.schemas.customers import (
     CustomerUpdate,
     CustomerVisit,
 )
+from app.services.audit import record_audit
 from app.services.customers import scoped_customer_query
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
@@ -141,6 +142,20 @@ def create_customer(
         territory_route=payload.territory_route or "Central Commercial Route",
     )
     db.add(customer)
+    record_audit(
+        db,
+        event_type="customer.created",
+        tenant_id=user.tenant_id,
+        actor_user_id=user.id,
+        target_type="customer",
+        target_id=str(customer.id),
+        details={
+            "company_name": customer.company_name,
+            "contact_phone": customer.contact_phone,
+            "location": customer.location,
+            "external_id": customer.external_customer_id,
+        },
+    )
     db.commit()
     db.refresh(customer)
     return customer
@@ -181,6 +196,20 @@ def update_customer(
     if payload.assigned_seller_id is not None:
         customer.assigned_seller_id = payload.assigned_seller_id
 
+    record_audit(
+        db,
+        event_type="customer.updated",
+        tenant_id=user.tenant_id,
+        actor_user_id=user.id,
+        target_type="customer",
+        target_id=str(customer.id),
+        details={
+            "company_name": customer.company_name,
+            "contact_phone": customer.contact_phone,
+            "outstanding_balance": str(customer.outstanding_balance) if customer.outstanding_balance else "0",
+            "credit_terms": customer.credit_terms,
+        },
+    )
     db.commit()
     db.refresh(customer)
     return customer
@@ -237,6 +266,15 @@ def delete_customer(
         .values(customer_id=None)
     )
     db.delete(customer)
+    record_audit(
+        db,
+        event_type="customer.deleted",
+        tenant_id=user.tenant_id,
+        actor_user_id=user.id,
+        target_type="customer",
+        target_id=str(customer_id),
+        details={"company_name": client_name},
+    )
     db.commit()
     return MessageResponse(message=f"Client '{client_name}' deleted successfully.")
 
