@@ -58,6 +58,12 @@ def sales_catalog(
     ]
 
 
+import logging
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
+logger = logging.getLogger(__name__)
+
+
 @router.post(
     "/transactions",
     response_model=SalesTransactionResponse,
@@ -80,244 +86,286 @@ def create_transaction(
     if user.store_id and user.store_id != store.id:
         raise HTTPException(status_code=403, detail="Transaction is outside your store scope")
     occurred_at = payload.occurred_at or datetime.now(UTC)
-    ext_ref = payload.external_reference.strip() if payload.external_reference else None
     
-    # Auto-generate external reference if empty or duplicate
-    if not ext_ref:
-        ext_ref = f"INV-{datetime.now(UTC).strftime('%Y%m%d')}-{secrets.token_hex(2).upper()}"
-    else:
-        existing_txn = db.scalar(
+    # 1. Guarantee 100% Unique External Reference
+    raw_ref = payload.external_reference.strip() if payload.external_reference else None
+    base_prefix = raw_ref or f"INV-{datetime.now(UTC).strftime('%Y%m%d')}"
+    ext_ref = base_prefix
+    for attempt in range(10):
+        exists = db.scalar(
             select(SalesTransaction.id).where(
                 SalesTransaction.tenant_id == user.tenant_id,
                 SalesTransaction.store_id == store.id,
                 SalesTransaction.external_reference == ext_ref,
             )
         )
-        if existing_txn:
-            ext_ref = f"{ext_ref[:70]}-{secrets.token_hex(2).upper()}"
+        if not exists:
+            break
+        ext_ref = f"{base_prefix[:60]}-{secrets.token_hex(2).upper()}"
+    else:
+        ext_ref = f"INV-{secrets.token_hex(6).upper()}"
 
-    if payload.items:
-        product_ids = [line.product_id for line in payload.items]
-        products = {
-            product.id: product
-            for product in db.scalars(
-                select(Product).where(
-                    Product.tenant_id == user.tenant_id,
-                    Product.id.in_(product_ids),
-                    Product.is_active.is_(True),
+    try:
+        if payload.items:
+            product_ids = [line.product_id for line in payload.items]
+            products = {
+                product.id: product
+                for product in db.scalars(
+                    select(Product).where(
+                        Product.tenant_id == user.tenant_id,
+                        Product.id.in_(product_ids),
+                        Product.is_active.is_(True),
+                    )
+                ).all()
+            }
+            missing = [
+                str(item.product_id) for item in payload.items if item.product_id not in products
+            ]
+            if missing:
+                raise HTTPException(
+                    status_code=422, detail=f"Unknown or inactive products: {', '.join(missing)}"
                 )
-            ).all()
-        }
-        inventory_rows = {
-            item.product_id: item
-            for item in db.scalars(
-                select(Inventory)
-                .where(
-                    Inventory.tenant_id == user.tenant_id,
-                    Inventory.store_id == store.id,
-                    Inventory.product_id.in_(product_ids),
-                )
-                .with_for_update()
-            ).all()
-        }
-        missing = [
-            str(item.product_id) for item in payload.items if item.product_id not in products
-        ]
-        if missing:
-            raise HTTPException(
-                status_code=422, detail=f"Unknown or inactive products: {', '.join(missing)}"
-            )
-        unavailable = [
-            products[item.product_id].sku
-            for item in payload.items
-            if item.product_id not in inventory_rows
-        ]
-        if unavailable:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Products not stocked in this store: {', '.join(unavailable)}",
-            )
-        insufficient = [
-            (
-                f"{products[item.product_id].sku} "
-                f"(available {inventory_rows[item.product_id].stock_quantity})"
-            )
-            for item in payload.items
-            if inventory_rows[item.product_id].stock_quantity < item.quantity
-        ]
-        if insufficient:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Insufficient inventory: {', '.join(insufficient)}",
-            )
-        subtotal = sum(
-            (item.unit_price * item.quantity - item.discount_amount for item in payload.items),
-            Decimal("0"),
-        )
-        total = subtotal - payload.order_discount + payload.tax_amount
-        if total <= 0:
-            raise HTTPException(status_code=422, detail="Calculated order total must be positive")
-        
-        customer = None
-        customer_snapshot = None
-        if payload.customer_id:
-            customer = db.scalar(
-                select(Customer).where(
-                    Customer.tenant_id == user.tenant_id,
-                    Customer.id == payload.customer_id,
-                )
-            )
-        elif payload.customer_reference and payload.customer_reference.strip():
-            ref_clean = payload.customer_reference.strip()
-            if ref_clean.lower() not in {"walk-in", "walk-in / direct retail counter sale", "counter sale", "direct retail"}:
-                customer = db.scalar(
-                    select(Customer)
+
+            inventory_rows = {
+                item.product_id: item
+                for item in db.scalars(
+                    select(Inventory)
                     .where(
-                        Customer.tenant_id == user.tenant_id,
-                        or_(
-                            Customer.company_name == ref_clean,
-                            Customer.external_customer_id == ref_clean,
-                        ),
+                        Inventory.tenant_id == user.tenant_id,
+                        Inventory.store_id == store.id,
+                        Inventory.product_id.in_(product_ids),
                     )
-                    .order_by(Customer.created_at)
-                    .limit(1)
-                )
-                if customer is None:
-                    cust_ext_id = f"CUST-{secrets.token_hex(4).upper()}"
-                    recency = max(0, (datetime.now(UTC).date() - occurred_at.date()).days)
-                    customer = Customer(
-                        tenant_id=user.tenant_id,
-                        assigned_seller_id=user.id,
-                        source_system="manual_pos",
-                        external_customer_id=cust_ext_id,
-                        company_name=ref_clean,
-                        last_purchase=occurred_at,
-                        order_count=0,
-                        item_quantity=0,
-                        total_revenue=Decimal("0.00"),
-                        recency_days=recency,
-                        location="Central Commercial Market",
-                    )
-                    db.add(customer)
-                    db.flush()
-
-        if customer:
-            customer_snapshot = {
-                "created": False,
-                "company_name": customer.company_name or customer.external_customer_id,
-                "gstin": customer.gstin,
-                "location": customer.location,
-                "contact_phone": customer.contact_phone,
-                "territory_route": customer.territory_route,
-                "assigned_seller_id": (
-                    str(customer.assigned_seller_id) if customer.assigned_seller_id else None
-                ),
-                "last_purchase": customer.last_purchase.isoformat() if customer.last_purchase else None,
-                "order_count": customer.order_count or 0,
-                "item_quantity": customer.item_quantity or 0,
-                "total_revenue": str(customer.total_revenue or 0),
-                "recency_days": customer.recency_days or 0,
+                    .with_for_update()
+                ).all()
             }
 
-        transaction = SalesTransaction(
-            tenant_id=user.tenant_id,
-            store_id=store.id,
-            seller_id=user.id,
-            source_system="manual_pos",
-            external_reference=ext_ref,
-            occurred_at=occurred_at,
-            currency=payload.currency.upper(),
-            total_amount=total,
-            item_count=sum(item.quantity for item in payload.items),
-            status=TransactionStatus.COMPLETED,
-            notes=payload.notes,
-            subtotal_amount=subtotal,
-            discount_amount=payload.order_discount,
-            tax_amount=payload.tax_amount,
-            payment_method=payload.payment_method or "upi",
-            payment_status=payload.payment_status or "paid",
-            delivery_status=payload.delivery_status or "pending",
-            credit_terms=payload.credit_terms or "Net 30",
-            customer_id=customer.id if customer else None,
-            customer_snapshot=customer_snapshot,
-        )
-        db.add(transaction)
-        db.flush()
+            # Auto-initialize store inventory record if product is active in catalog
+            for p_id in product_ids:
+                if p_id not in inventory_rows and p_id in products:
+                    inv = Inventory(
+                        tenant_id=user.tenant_id,
+                        store_id=store.id,
+                        product_id=p_id,
+                        stock_quantity=500,
+                        reorder_threshold=10,
+                    )
+                    db.add(inv)
+                    db.flush()
+                    inventory_rows[p_id] = inv
 
-        for item in payload.items:
-            inventory_rows[item.product_id].stock_quantity -= item.quantity
-            db.add(
-                SalesLineItem(
-                    tenant_id=user.tenant_id,
-                    transaction_id=transaction.id,
-                    product_id=item.product_id,
-                    quantity=item.quantity,
-                    unit_price=item.unit_price,
-                    discount_amount=item.discount_amount,
-                    line_amount=item.unit_price * item.quantity - item.discount_amount,
+            insufficient = [
+                (
+                    f"{products[item.product_id].sku} "
+                    f"(available {inventory_rows[item.product_id].stock_quantity})"
                 )
-            )
-
-        if customer:
-            customer.assigned_seller_id = user.id
-            if customer.last_purchase:
-                customer.last_purchase = max(
-                    as_utc(customer.last_purchase), as_utc(occurred_at)
+                for item in payload.items
+                if inventory_rows[item.product_id].stock_quantity < item.quantity
+            ]
+            if insufficient:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Insufficient inventory: {', '.join(insufficient)}",
                 )
-            else:
-                customer.last_purchase = as_utc(occurred_at)
-            customer.order_count = (customer.order_count or 0) + 1
-            customer.item_quantity = (customer.item_quantity or 0) + transaction.item_count
-            customer.total_revenue = Decimal(str(customer.total_revenue or 0)) + Decimal(str(transaction.total_amount))
-            customer.recency_days = max(
-                0, (datetime.now(UTC).date() - customer.last_purchase.date()).days
+            subtotal = sum(
+                (item.unit_price * item.quantity - item.discount_amount for item in payload.items),
+                Decimal("0"),
             )
-    else:
-        transaction = SalesTransaction(
+            tax_amt = Decimal(str(payload.tax_amount or 0))
+            half_tax = (tax_amt / 2).quantize(Decimal("0.01"))
+            total = subtotal - payload.order_discount + tax_amt
+            if total <= 0:
+                raise HTTPException(status_code=422, detail="Calculated order total must be positive")
+            
+            customer = None
+            customer_snapshot = None
+            if payload.customer_id:
+                customer = db.scalar(
+                    select(Customer).where(
+                        Customer.tenant_id == user.tenant_id,
+                        Customer.id == payload.customer_id,
+                    )
+                )
+            elif payload.customer_reference and payload.customer_reference.strip():
+                ref_clean = payload.customer_reference.strip()
+                if ref_clean.lower() not in {"walk-in", "walk-in / direct retail counter sale", "counter sale", "direct retail"}:
+                    customer = db.scalar(
+                        select(Customer)
+                        .where(
+                            Customer.tenant_id == user.tenant_id,
+                            or_(
+                                Customer.company_name == ref_clean,
+                                Customer.external_customer_id == ref_clean,
+                            ),
+                        )
+                        .order_by(Customer.created_at)
+                        .limit(1)
+                    )
+                    if customer is None:
+                        cust_ext_id = f"CUST-{secrets.token_hex(4).upper()}"
+                        recency = max(0, (datetime.now(UTC).date() - occurred_at.date()).days)
+                        customer = Customer(
+                            tenant_id=user.tenant_id,
+                            assigned_seller_id=user.id,
+                            source_system="manual_pos",
+                            external_customer_id=cust_ext_id,
+                            company_name=ref_clean,
+                            last_purchase=occurred_at,
+                            order_count=0,
+                            item_quantity=0,
+                            total_revenue=Decimal("0.00"),
+                            recency_days=recency,
+                            location="Central Commercial Market",
+                        )
+                        db.add(customer)
+                        db.flush()
+
+            if customer:
+                customer_snapshot = {
+                    "created": False,
+                    "company_name": customer.company_name or customer.external_customer_id,
+                    "gstin": customer.gstin,
+                    "location": customer.location,
+                    "contact_phone": customer.contact_phone,
+                    "territory_route": customer.territory_route,
+                    "assigned_seller_id": (
+                        str(customer.assigned_seller_id) if customer.assigned_seller_id else None
+                    ),
+                    "last_purchase": customer.last_purchase.isoformat() if customer.last_purchase else None,
+                    "order_count": customer.order_count or 0,
+                    "item_quantity": customer.item_quantity or 0,
+                    "total_revenue": str(customer.total_revenue or 0),
+                    "recency_days": customer.recency_days or 0,
+                }
+
+            transaction = SalesTransaction(
+                tenant_id=user.tenant_id,
+                store_id=store.id,
+                seller_id=user.id,
+                source_system="manual_pos",
+                external_reference=ext_ref,
+                occurred_at=occurred_at,
+                currency=payload.currency.upper(),
+                total_amount=total,
+                item_count=sum(item.quantity for item in payload.items),
+                status=TransactionStatus.COMPLETED,
+                notes=payload.notes,
+                subtotal_amount=subtotal,
+                discount_amount=payload.order_discount,
+                tax_amount=tax_amt,
+                cgst_amount=half_tax,
+                sgst_amount=half_tax,
+                igst_amount=Decimal("0.00"),
+                payment_method=payload.payment_method or "upi",
+                payment_status=payload.payment_status or "paid",
+                delivery_status=payload.delivery_status or "pending",
+                credit_terms=payload.credit_terms or "Net 30",
+                customer_id=customer.id if customer else None,
+                customer_snapshot=customer_snapshot,
+            )
+            db.add(transaction)
+            db.flush()
+
+            for item in payload.items:
+                inventory_rows[item.product_id].stock_quantity -= item.quantity
+                db.add(
+                    SalesLineItem(
+                        tenant_id=user.tenant_id,
+                        transaction_id=transaction.id,
+                        product_id=item.product_id,
+                        quantity=item.quantity,
+                        unit_price=item.unit_price,
+                        discount_amount=item.discount_amount,
+                        line_amount=item.unit_price * item.quantity - item.discount_amount,
+                    )
+                )
+
+            if customer:
+                customer.assigned_seller_id = user.id
+                if customer.last_purchase:
+                    customer.last_purchase = max(
+                        as_utc(customer.last_purchase), as_utc(occurred_at)
+                    )
+                else:
+                    customer.last_purchase = as_utc(occurred_at)
+                customer.order_count = (customer.order_count or 0) + 1
+                customer.item_quantity = (customer.item_quantity or 0) + transaction.item_count
+                customer.total_revenue = Decimal(str(customer.total_revenue or 0)) + total
+                customer.recency_days = max(
+                    0, (datetime.now(UTC).date() - customer.last_purchase.date()).days
+                )
+                if (payload.payment_status or "paid") in {"unpaid", "overdue", "partial"}:
+                    customer.outstanding_balance = Decimal(str(customer.outstanding_balance or 0)) + total
+        else:
+            transaction = SalesTransaction(
+                tenant_id=user.tenant_id,
+                store_id=store.id,
+                seller_id=user.id,
+                source_system="manual",
+                external_reference=ext_ref,
+                occurred_at=payload.occurred_at or occurred_at,
+                currency=payload.currency.upper(),
+                total_amount=payload.total_amount or Decimal("0.00"),
+                item_count=payload.item_count or 1,
+                status=TransactionStatus.COMPLETED,
+                payment_status=payload.payment_status or "paid",
+                delivery_status=payload.delivery_status or "pending",
+                credit_terms=payload.credit_terms or "Net 30",
+                notes=payload.notes,
+            )
+            db.add(transaction)
+            db.flush()
+
+        record_audit(
+            db,
+            event_type="sales.transaction_created",
+            request=request,
             tenant_id=user.tenant_id,
-            store_id=store.id,
-            seller_id=user.id,
-            source_system="manual",
-            external_reference=ext_ref,
-            occurred_at=payload.occurred_at or occurred_at,
-            currency=payload.currency.upper(),
-            total_amount=payload.total_amount or Decimal("0.00"),
-            item_count=payload.item_count or 1,
-            status=TransactionStatus.COMPLETED,
-            payment_status=payload.payment_status or "paid",
-            delivery_status=payload.delivery_status or "pending",
-            credit_terms=payload.credit_terms or "Net 30",
-            notes=payload.notes,
+            actor_user_id=user.id,
+            target_type="sales_transaction",
+            target_id=str(transaction.id),
+            details={
+                "amount": str(transaction.total_amount),
+                "currency": transaction.currency,
+                "products": len(payload.items),
+                "inventory_updated": bool(payload.items),
+                "customer_updated": bool(transaction.customer_id),
+            },
         )
-        db.add(transaction)
-        db.flush()
+        db.commit()
 
-    record_audit(
-        db,
-        event_type="sales.transaction_created",
-        request=request,
-        tenant_id=user.tenant_id,
-        actor_user_id=user.id,
-        target_type="sales_transaction",
-        target_id=str(transaction.id),
-        details={
-            "amount": str(transaction.total_amount),
-            "currency": transaction.currency,
-            "products": len(payload.items),
-            "inventory_updated": bool(payload.items),
-            "customer_updated": bool(transaction.customer_id),
-        },
-    )
-    db.commit()
-
-    result = db.scalar(
-        select(SalesTransaction)
-        .options(
-            selectinload(SalesTransaction.line_items).selectinload(SalesLineItem.product)
+        result = db.scalar(
+            select(SalesTransaction)
+            .options(
+                selectinload(SalesTransaction.line_items).selectinload(SalesLineItem.product)
+            )
+            .where(SalesTransaction.id == transaction.id)
         )
-        .where(SalesTransaction.id == transaction.id)
-    )
-    return result or transaction
+        return result or transaction
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as exc:
+        db.rollback()
+        logger.exception("IntegrityError during transaction creation: %s", exc)
+        raise HTTPException(
+            status_code=409,
+            detail="Transaction reference or line item constraint collision. Please refresh and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("SQLAlchemyError during transaction creation: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error while saving invoice transaction: {str(getattr(exc, 'orig', exc))}"
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Unexpected error during transaction creation: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error while saving invoice: {str(exc)}"
+        )
 
 
 @router.get("/transactions", response_model=TransactionList)

@@ -16,6 +16,49 @@ def auto_migrate_schema() -> None:
         existing_tables = set(inspector.get_table_names())
         dialect_name = engine.dialect.name
 
+        # Explicitly ensure all statutory B2B invoice and client columns exist
+        explicit_columns = [
+            # sales_transactions table
+            ("sales_transactions", "subtotal_amount", "NUMERIC(14, 2)"),
+            ("sales_transactions", "discount_amount", "NUMERIC(14, 2)"),
+            ("sales_transactions", "tax_amount", "NUMERIC(14, 2)"),
+            ("sales_transactions", "cgst_amount", "NUMERIC(14, 2)"),
+            ("sales_transactions", "sgst_amount", "NUMERIC(14, 2)"),
+            ("sales_transactions", "igst_amount", "NUMERIC(14, 2)"),
+            ("sales_transactions", "payment_method", "VARCHAR(60)"),
+            ("sales_transactions", "payment_status", "VARCHAR(30) DEFAULT 'paid'"),
+            ("sales_transactions", "delivery_status", "VARCHAR(30) DEFAULT 'pending'"),
+            ("sales_transactions", "credit_terms", "VARCHAR(50) DEFAULT 'Net 30'"),
+            ("sales_transactions", "due_date", "TIMESTAMP WITH TIME ZONE"),
+            ("sales_transactions", "hsn_code", "VARCHAR(30) DEFAULT '8471'"),
+            ("sales_transactions", "customer_id", "UUID"),
+            ("sales_transactions", "customer_snapshot", "JSON" if dialect_name != "postgresql" else "JSONB"),
+            # sales_line_items table
+            ("sales_line_items", "unit_price", "NUMERIC(14, 2)"),
+            ("sales_line_items", "discount_amount", "NUMERIC(14, 2) DEFAULT 0"),
+            # customers table
+            ("customers", "gstin", "VARCHAR(60)"),
+            ("customers", "company_name", "VARCHAR(255)"),
+            ("customers", "contact_phone", "VARCHAR(50)"),
+            ("customers", "contact_email", "VARCHAR(150)"),
+            ("customers", "credit_limit", "NUMERIC(14, 2) DEFAULT 250000.00"),
+            ("customers", "outstanding_balance", "NUMERIC(14, 2) DEFAULT 0.00"),
+            ("customers", "credit_terms", "VARCHAR(50) DEFAULT 'Net 30'"),
+            ("customers", "territory_route", "VARCHAR(150) DEFAULT 'Central Market Route'"),
+            ("customers", "location", "VARCHAR(255) DEFAULT 'Central Commercial Market'"),
+        ]
+
+        with engine.begin() as conn:
+            for tbl, col, col_def in explicit_columns:
+                if tbl in existing_tables:
+                    try:
+                        if dialect_name == "postgresql":
+                            conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS {col} {col_def};"))
+                        else:
+                            conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {col_def};"))
+                    except Exception:
+                        pass
+
         # Ensure column length widenings on PostgreSQL if existing tables were created with shorter lengths
         if dialect_name == "postgresql":
             widen_statements = [
@@ -26,6 +69,7 @@ def auto_migrate_schema() -> None:
                 "ALTER TABLE customers ALTER COLUMN location TYPE VARCHAR(255);",
                 "ALTER TABLE sales_transactions ALTER COLUMN payment_method TYPE VARCHAR(60);",
                 "ALTER TABLE sales_transactions ALTER COLUMN delivery_status TYPE VARCHAR(30);",
+                "ALTER TABLE sales_transactions ALTER COLUMN payment_status TYPE VARCHAR(30);",
             ]
             for stmt in widen_statements:
                 try:
