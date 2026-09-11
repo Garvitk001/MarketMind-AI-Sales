@@ -1,13 +1,15 @@
 from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import UUID
+import secrets
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import DBSession, require_permissions
 from app.core.permissions import Permissions
-from app.core.security import as_utc
+from app.core.security import as_utc, random_token
 from app.models.customers import Customer
 from app.models.identity import Store, User
 from app.models.inventory import Inventory, Product
@@ -50,6 +52,7 @@ def sales_catalog(
             name=product.name,
             category=product.category,
             available_stock=inventory.stock_quantity,
+            unit_price=product.unit_mrp,
         )
         for inventory, product in rows
     ]
@@ -78,17 +81,20 @@ def create_transaction(
         raise HTTPException(status_code=403, detail="Transaction is outside your store scope")
     occurred_at = payload.occurred_at or datetime.now(UTC)
     ext_ref = payload.external_reference.strip() if payload.external_reference else None
-    if ext_ref and db.scalar(
-        select(SalesTransaction.id).where(
-            SalesTransaction.tenant_id == user.tenant_id,
-            SalesTransaction.store_id == store.id,
-            SalesTransaction.external_reference == ext_ref,
-        )
-    ):
-        raise HTTPException(status_code=409, detail="Transaction reference already exists in this store")
-
+    
+    # Auto-generate external reference if empty or duplicate
     if not ext_ref:
-        ext_ref = f"INV-{datetime.now(UTC).strftime('%Y%m%d')}-{random_token()[:4].upper()}"
+        ext_ref = f"INV-{datetime.now(UTC).strftime('%Y%m%d')}-{secrets.token_hex(2).upper()}"
+    else:
+        existing_txn = db.scalar(
+            select(SalesTransaction.id).where(
+                SalesTransaction.tenant_id == user.tenant_id,
+                SalesTransaction.store_id == store.id,
+                SalesTransaction.external_reference == ext_ref,
+            )
+        )
+        if existing_txn:
+            ext_ref = f"{ext_ref[:70]}-{secrets.token_hex(2).upper()}"
 
     if payload.items:
         product_ids = [line.product_id for line in payload.items]
@@ -151,6 +157,7 @@ def create_transaction(
         total = subtotal - payload.order_discount + payload.tax_amount
         if total <= 0:
             raise HTTPException(status_code=422, detail="Calculated order total must be positive")
+        
         customer = None
         customer_snapshot = None
         if payload.customer_id:
@@ -160,58 +167,41 @@ def create_transaction(
                     Customer.id == payload.customer_id,
                 )
             )
-        if not customer and payload.customer_reference:
-            from sqlalchemy import or_
+        elif payload.customer_reference and payload.customer_reference.strip():
             ref_clean = payload.customer_reference.strip()
-            customer = db.scalar(
-                select(Customer)
-                .where(
-                    Customer.tenant_id == user.tenant_id,
-                    or_(
-                        Customer.external_customer_id == ref_clean,
-                        Customer.company_name == ref_clean,
-                    ),
-                )
-                .order_by(Customer.created_at)
-                .limit(1)
-            )
-            recency = max(0, (datetime.now(UTC).date() - occurred_at.date()).days)
-            if customer is None:
-                cust_ext_id = ref_clean
-                existing_cust = db.scalar(
-                    select(Customer.id).where(
+            if ref_clean.lower() not in {"walk-in", "walk-in / direct retail counter sale", "counter sale", "direct retail"}:
+                customer = db.scalar(
+                    select(Customer)
+                    .where(
                         Customer.tenant_id == user.tenant_id,
-                        Customer.source_system == "manual_pos",
-                        Customer.external_customer_id == cust_ext_id,
+                        or_(
+                            Customer.company_name == ref_clean,
+                            Customer.external_customer_id == ref_clean,
+                        ),
                     )
+                    .order_by(Customer.created_at)
+                    .limit(1)
                 )
-                if existing_cust:
-                    cust_ext_id = f"{cust_ext_id}-{random_token()[:4]}"
+                if customer is None:
+                    cust_ext_id = f"CUST-{secrets.token_hex(4).upper()}"
+                    recency = max(0, (datetime.now(UTC).date() - occurred_at.date()).days)
+                    customer = Customer(
+                        tenant_id=user.tenant_id,
+                        assigned_seller_id=user.id,
+                        source_system="manual_pos",
+                        external_customer_id=cust_ext_id,
+                        company_name=ref_clean,
+                        last_purchase=occurred_at,
+                        order_count=0,
+                        item_quantity=0,
+                        total_revenue=Decimal("0.00"),
+                        recency_days=recency,
+                        location="Central Commercial Market",
+                    )
+                    db.add(customer)
+                    db.flush()
 
-                customer = Customer(
-                    tenant_id=user.tenant_id,
-                    assigned_seller_id=user.id,
-                    source_system="manual_pos",
-                    external_customer_id=cust_ext_id,
-                    company_name=ref_clean,
-                    last_purchase=occurred_at,
-                    order_count=0,
-                    item_quantity=0,
-                    total_revenue=Decimal("0.00"),
-                    recency_days=recency,
-                    location="Central Commercial Market",
-                )
-                db.add(customer)
-                db.flush()
-                customer_snapshot = {
-                    "created": True,
-                    "company_name": customer.company_name,
-                    "gstin": customer.gstin,
-                    "location": customer.location,
-                    "contact_phone": customer.contact_phone,
-                    "territory_route": customer.territory_route,
-                }
-        if customer and not customer_snapshot:
+        if customer:
             customer_snapshot = {
                 "created": False,
                 "company_name": customer.company_name or customer.external_customer_id,
@@ -228,6 +218,7 @@ def create_transaction(
                 "total_revenue": str(customer.total_revenue or 0),
                 "recency_days": customer.recency_days or 0,
             }
+
         transaction = SalesTransaction(
             tenant_id=user.tenant_id,
             store_id=store.id,
@@ -252,6 +243,7 @@ def create_transaction(
         )
         db.add(transaction)
         db.flush()
+
         for item in payload.items:
             inventory_rows[item.product_id].stock_quantity -= item.quantity
             db.add(
@@ -265,6 +257,7 @@ def create_transaction(
                     line_amount=item.unit_price * item.quantity - item.discount_amount,
                 )
             )
+
         if customer:
             customer.assigned_seller_id = user.id
             if customer.last_purchase:
@@ -288,8 +281,8 @@ def create_transaction(
             external_reference=ext_ref,
             occurred_at=payload.occurred_at or occurred_at,
             currency=payload.currency.upper(),
-            total_amount=payload.total_amount,
-            item_count=payload.item_count,
+            total_amount=payload.total_amount or Decimal("0.00"),
+            item_count=payload.item_count or 1,
             status=TransactionStatus.COMPLETED,
             payment_status=payload.payment_status or "paid",
             delivery_status=payload.delivery_status or "pending",
@@ -298,6 +291,7 @@ def create_transaction(
         )
         db.add(transaction)
         db.flush()
+
     record_audit(
         db,
         event_type="sales.transaction_created",
@@ -315,8 +309,15 @@ def create_transaction(
         },
     )
     db.commit()
-    db.refresh(transaction)
-    return transaction
+
+    result = db.scalar(
+        select(SalesTransaction)
+        .options(
+            selectinload(SalesTransaction.line_items).selectinload(SalesLineItem.product)
+        )
+        .where(SalesTransaction.id == transaction.id)
+    )
+    return result or transaction
 
 
 @router.get("/transactions", response_model=TransactionList)

@@ -383,6 +383,31 @@ export const SalesModule = () => {
     event.preventDefault();
     setIsSaving(true);
     try {
+      if (modalMode === 'create') {
+        if (!form.items.length) {
+          addToast('Please add at least one line item.', 'danger');
+          setIsSaving(false);
+          return;
+        }
+        for (const item of form.items) {
+          if (!item.productId) {
+            addToast('Please select a product SKU for all line items.', 'danger');
+            setIsSaving(false);
+            return;
+          }
+          if (!item.unitPrice || Number(item.unitPrice) <= 0) {
+            addToast('Please enter a valid unit price greater than 0 for all products.', 'danger');
+            setIsSaving(false);
+            return;
+          }
+          if (!item.quantity || Number(item.quantity) <= 0) {
+            addToast('Please enter a valid quantity greater than 0.', 'danger');
+            setIsSaving(false);
+            return;
+          }
+        }
+      }
+
       const selectedCust = customers.find((c) => c.id === form.selectedCustomerId);
       const custRef = selectedCust ? (selectedCust.company_name || selectedCust.name) : form.customerReference.trim();
 
@@ -442,10 +467,20 @@ export const SalesModule = () => {
   };
 
   const updateLine = (index, field, value) =>
-    setForm((current) => ({
-      ...current,
-      items: current.items.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item))
-    }));
+    setForm((current) => {
+      const updated = current.items.map((item, itemIndex) => {
+        if (itemIndex !== index) return item;
+        const next = { ...item, [field]: value };
+        if (field === 'productId') {
+          const catItem = catalog.find((p) => p.product_id === value);
+          if (catItem && (catItem.unit_price || catItem.price || catItem.unit_mrp)) {
+            next.unitPrice = String(catItem.unit_price || catItem.price || catItem.unit_mrp);
+          }
+        }
+        return next;
+      });
+      return { ...current, items: updated };
+    });
 
   const addLine = () =>
     setForm((current) => ({

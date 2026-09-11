@@ -123,3 +123,4 @@ class SalesCatalogItem(BaseModel):
     name: str
     category: str | None
     available_stock: int
+    unit_price: Decimal | None = None
