@@ -305,6 +305,31 @@ export const OwnerDashboard = ({ onNavigate }) => {
     return { outstandingCredit: total, creditAgingData: aging };
   }, [salesTransactions, customers]);
 
+  const deliveryStats = useMemo(() => {
+    const deals = salesTransactions || [];
+    const delivered = deals.filter((d) => d.delivery_status === 'delivered');
+    const outForDelivery = deals.filter((d) => d.delivery_status === 'out_for_delivery');
+    const pending = deals.filter((d) => !d.delivery_status || d.delivery_status === 'pending');
+
+    const deliveredVal = delivered.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
+    const outForDeliveryVal = outForDelivery.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
+    const pendingVal = pending.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
+    const totalVal = deals.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
+    const fulfillmentRate = deals.length > 0 ? Math.round((delivered.length / deals.length) * 100) : 100;
+
+    return {
+      deliveredCount: delivered.length,
+      deliveredVal,
+      outForDeliveryCount: outForDelivery.length,
+      outForDeliveryVal,
+      pendingCount: pending.length,
+      pendingVal,
+      totalCount: deals.length,
+      totalVal,
+      fulfillmentRate
+    };
+  }, [salesTransactions]);
+
   const poStats = useMemo(() => {
     const pending = purchaseOrders.filter((p) => p.status === 'pending_owner_approval').length;
     const approved = purchaseOrders.filter((p) => p.status === 'approved').length;
@@ -649,6 +674,88 @@ export const OwnerDashboard = ({ onNavigate }) => {
           </div>
         </Card>
       </div>
+
+      {/* Order Delivery Fulfillment & Logistics Telemetry */}
+      <Card className="border-blue-100 dark:border-blue-900/40 shadow-md">
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="w-5 h-5 text-blue-500" />
+                <span>{t('Order Delivery & Logistics Fulfillment')}</span>
+                <Badge variant="info">{t('Live Dispatch')}</Badge>
+              </CardTitle>
+              <CardDescription>
+                {t('Real-time tracking of orders delivered, in-transit, and awaiting dispatch across all stores')}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold px-3 py-1 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                Fulfillment: {deliveryStats.fulfillmentRate}%
+              </span>
+            </div>
+          </div>
+        </CardHeader>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+          {/* Delivered */}
+          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4" />
+                {t('Delivered Orders')}
+              </span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500">
+                {deliveryStats.deliveredCount} Orders
+              </span>
+            </div>
+            <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
+              {money(deliveryStats.deliveredVal)}
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              Goods successfully received and signed by clients
+            </p>
+          </div>
+
+          {/* Out for Delivery */}
+          <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                <Truck className="w-4 h-4" />
+                {t('Out for Delivery')}
+              </span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                {deliveryStats.outForDeliveryCount} Orders
+              </span>
+            </div>
+            <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-2">
+              {money(deliveryStats.outForDeliveryVal)}
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              En route on delivery routes with field executive
+            </p>
+          </div>
+
+          {/* Pending Dispatch */}
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                <Clock className="w-4 h-4" />
+                {t('Pending Dispatch')}
+              </span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-500">
+                {deliveryStats.pendingCount} Orders
+              </span>
+            </div>
+            <p className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-2">
+              {money(deliveryStats.pendingVal)}
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              Invoiced and awaiting warehouse packing / vehicle assignment
+            </p>
+          </div>
+        </div>
+      </Card>
 
       {/* Category Sales & Revenue Distribution Section */}
       <Card className="border-indigo-100 dark:border-slate-800 shadow-md">

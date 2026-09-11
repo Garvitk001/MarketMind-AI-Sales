@@ -26,7 +26,11 @@ import {
   Wallet,
   Building2,
   CreditCard,
-  Calendar
+  Calendar,
+  Truck,
+  UserPlus,
+  MapPin,
+  PackageCheck
 } from 'lucide-react';
 
 const emptyForm = () => ({
@@ -39,6 +43,7 @@ const emptyForm = () => ({
   customerReference: '',
   paymentMethod: 'upi',
   paymentStatus: 'paid',
+  deliveryStatus: 'pending',
   creditTerms: 'Net 30',
   orderDiscount: '0',
   taxAmount: '0',
@@ -53,6 +58,7 @@ export const SalesModule = () => {
   const { api, profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('all');
+  const [deliveryFilter, setDeliveryFilter] = useState('all');
   const [methodFilter, setMethodFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [startDate, setStartDate] = useState('');
@@ -64,6 +70,21 @@ export const SalesModule = () => {
   const [catalog, setCatalog] = useState([]);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [invoiceTransaction, setInvoiceTransaction] = useState(null);
+
+  // Quick Client Creation State
+  const [isQuickAddClientOpen, setIsQuickAddClientOpen] = useState(false);
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
+  const [newClientForm, setNewClientForm] = useState({
+    company_name: '',
+    name: '',
+    contact_phone: '',
+    contact_email: '',
+    location: '',
+    gstin: '',
+    credit_limit: '250000',
+    credit_terms: 'Net 30',
+    territory_route: 'Central Market'
+  });
 
   const openInvoiceModal = (deal) => {
     setInvoiceTransaction(deal);
@@ -81,6 +102,7 @@ export const SalesModule = () => {
   const deals = useMemo(() => {
     return (salesTransactions || []).map((transaction) => ({
       ...transaction,
+      delivery_status: transaction.delivery_status || 'pending',
       displayReference: transaction.external_reference || (transaction.id ? `INV-${transaction.id.slice(0, 8).toUpperCase()}` : 'INV-0001'),
       formattedAmount: new Intl.NumberFormat('en-IN', {
         style: 'currency',
@@ -103,6 +125,28 @@ export const SalesModule = () => {
     return { totalVolume, clearedCash, outstandingCredit, overdueCount };
   }, [deals]);
 
+  // Delivery Tracking KPIs
+  const deliveryKpis = useMemo(() => {
+    const deliveredDeals = deals.filter((d) => d.delivery_status === 'delivered');
+    const outForDeliveryDeals = deals.filter((d) => d.delivery_status === 'out_for_delivery');
+    const pendingDeals = deals.filter((d) => !d.delivery_status || d.delivery_status === 'pending');
+
+    const deliveredRevenue = deliveredDeals.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
+    const outForDeliveryRevenue = outForDeliveryDeals.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
+    const pendingRevenue = pendingDeals.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
+
+    return {
+      deliveredCount: deliveredDeals.length,
+      deliveredRevenue,
+      outForDeliveryCount: outForDeliveryDeals.length,
+      outForDeliveryRevenue,
+      pendingCount: pendingDeals.length,
+      pendingRevenue,
+      totalCount: deals.length,
+      fulfillmentRate: deals.length > 0 ? Math.round((deliveredDeals.length / deals.length) * 100) : 100
+    };
+  }, [deals]);
+
   const filteredDeals = deals.filter((deal) => {
     const customerObj = (customers || []).find((c) => c.id === deal.customer_id);
     const custName = customerObj ? (customerObj.company_name || customerObj.name) : (deal.customer_reference || '');
@@ -110,6 +154,7 @@ export const SalesModule = () => {
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
     const matchesPayment = paymentFilter === 'all' || deal.payment_status === paymentFilter;
+    const matchesDelivery = deliveryFilter === 'all' || deal.delivery_status === deliveryFilter;
     const matchesMethod = methodFilter === 'all' || (() => {
       const method = String(deal.payment_method || '').toLowerCase().trim();
       if (methodFilter === 'upi') return method.includes('upi') || method.includes('qr');
@@ -145,7 +190,7 @@ export const SalesModule = () => {
       }
     }
 
-    return matchesSearch && matchesPayment && matchesMethod && matchesDate;
+    return matchesSearch && matchesPayment && matchesDelivery && matchesMethod && matchesDate;
   });
 
   const orderSummary = useMemo(() => {
@@ -172,6 +217,7 @@ export const SalesModule = () => {
       setCatalog(await api('/sales/catalog'));
       setSelected(null);
       setForm(emptyForm());
+      setIsQuickAddClientOpen(false);
       setModalMode('create');
     } catch (error) {
       addToast(error.message, 'danger');
@@ -190,6 +236,7 @@ export const SalesModule = () => {
       customerReference: transaction.customer_reference || '',
       paymentMethod: transaction.payment_method || 'upi',
       paymentStatus: transaction.payment_status || 'paid',
+      deliveryStatus: transaction.delivery_status || 'pending',
       creditTerms: transaction.credit_terms || 'Net 30',
       notes: transaction.notes || '',
       items: [{ productId: '', quantity: '1', unitPrice: '', discountAmount: '0' }],
@@ -198,6 +245,75 @@ export const SalesModule = () => {
       taxAmount: String(transaction.tax_amount || '0')
     });
     setModalMode('edit');
+  };
+
+  const handleQuickCreateClient = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!newClientForm.company_name.trim()) {
+      addToast('Company Name is required', 'danger');
+      return;
+    }
+    setIsCreatingClient(true);
+    try {
+      const created = await api('/customers', {
+        method: 'POST',
+        body: JSON.stringify({
+          company_name: newClientForm.company_name.trim(),
+          name: newClientForm.name.trim() || newClientForm.company_name.trim(),
+          contact_phone: newClientForm.contact_phone.trim() || null,
+          contact_email: newClientForm.contact_email.trim() || null,
+          location: newClientForm.location.trim() || null,
+          gstin: newClientForm.gstin.trim() || null,
+          credit_limit: Number(newClientForm.credit_limit || 250000),
+          credit_terms: newClientForm.credit_terms || 'Net 30',
+          territory_route: newClientForm.territory_route.trim() || 'Central Wholesale Route'
+        })
+      });
+      addToast(`B2B Client "${created.company_name || created.name}" created and selected!`, 'success');
+      await refresh();
+      setForm((prev) => ({
+        ...prev,
+        selectedCustomerId: created.id,
+        creditTerms: created.credit_terms || prev.creditTerms
+      }));
+      setIsQuickAddClientOpen(false);
+      setNewClientForm({
+        company_name: '',
+        name: '',
+        contact_phone: '',
+        contact_email: '',
+        location: '',
+        gstin: '',
+        credit_limit: '250000',
+        credit_terms: 'Net 30',
+        territory_route: 'Central Market'
+      });
+    } catch (err) {
+      addToast(err.message || 'Failed to create new client', 'danger');
+    } finally {
+      setIsCreatingClient(false);
+    }
+  };
+
+  const updateDeliveryStatus = async (deal, newStatus) => {
+    setIsSaving(true);
+    try {
+      await api(`/sales/transactions/${deal.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ delivery_status: newStatus })
+      });
+      const labels = {
+        pending: 'Pending Dispatch',
+        out_for_delivery: 'Out for Delivery',
+        delivered: 'Delivered'
+      };
+      addToast(`Order ${deal.displayReference} updated to ${labels[newStatus] || newStatus}`, 'success');
+      await refresh();
+    } catch (error) {
+      addToast(error.message || 'Failed to update delivery status', 'danger');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const markAsPaid = async (deal) => {
@@ -240,6 +356,8 @@ export const SalesModule = () => {
             store_id: profile?.store_id || user?.store_id || undefined,
             currency: (form.currency || 'INR').toUpperCase(),
             payment_method: form.paymentMethod,
+            payment_status: form.paymentStatus,
+            delivery_status: form.deliveryStatus,
             customer_reference: custRef || null,
             order_discount: Number(form.orderDiscount || 0),
             tax_amount: Number(orderSummary.tax),
@@ -252,13 +370,14 @@ export const SalesModule = () => {
             }))
           })
         });
-        addToast('Sales transaction recorded. Inventory and customer ledgers updated.', 'success');
+        addToast('Sales transaction recorded. Inventory, delivery, and customer ledgers updated.', 'success');
       } else {
         await api(`/sales/transactions/${selected.id}`, {
           method: 'PATCH',
           body: JSON.stringify({
             ...payload,
-            payment_status: form.paymentStatus
+            payment_status: form.paymentStatus,
+            delivery_status: form.deliveryStatus
           })
         });
         addToast('Sales transaction updated successfully.', 'success');
@@ -378,7 +497,7 @@ export const SalesModule = () => {
         </div>
       </div>
 
-      {/* Commercial Summary Business KPIs */}
+      {/* Commercial & Delivery Summary Business KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-4 bg-gradient-to-br from-indigo-900/20 to-slate-900/40 border-indigo-500/20">
           <div className="flex items-center justify-between">
@@ -413,20 +532,31 @@ export const SalesModule = () => {
           <p className="text-[10px] text-amber-400/80 mt-1">Pending collection on credit terms</p>
         </Card>
 
-        <Card className="p-4 bg-gradient-to-br from-rose-900/20 to-slate-900/40 border-rose-500/20">
+        {/* Delivery Fulfillment KPI Card */}
+        <Card className="p-4 bg-gradient-to-br from-blue-900/20 to-slate-900/40 border-blue-500/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Overdue Risk Invoices</span>
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
+            <span className="text-xs font-semibold text-slate-400">Order Delivery Status</span>
+            <Truck className="w-4 h-4 text-blue-400" />
           </div>
-          <p className="text-xl font-bold text-rose-400 mt-2">{ledgerKpis.overdueCount} Invoices</p>
-          <p className="text-[10px] text-rose-400/80 mt-1">Past credit terms requiring immediate recovery</p>
+          <div className="mt-2 flex items-baseline justify-between">
+            <p className="text-xl font-bold text-emerald-400">
+              {deliveryKpis.deliveredCount} <span className="text-xs font-medium text-slate-400">Delivered</span>
+            </p>
+            <span className="text-[11px] font-bold text-blue-400">
+              {deliveryKpis.fulfillmentRate}% Fulfilled
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
+            <span>🚚 Out: {deliveryKpis.outForDeliveryCount}</span>
+            <span>⏳ Pending: {deliveryKpis.pendingCount}</span>
+          </p>
         </Card>
       </div>
 
       {/* Main Ledger Table Card */}
       <Card>
-        <CardHeader className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+        <CardHeader className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full">
             {/* Search Input */}
             <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -439,21 +569,21 @@ export const SalesModule = () => {
               />
             </div>
 
-            {/* Payment Method Selector */}
-            <select
-              value={methodFilter}
-              onChange={(e) => setMethodFilter(e.target.value)}
-              className="py-2 px-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-700 dark:text-slate-300 focus:outline-none"
-            >
-              <option value="all">All Payment Methods</option>
-              <option value="upi">UPI / QR Code</option>
-              <option value="cash">Cash Counter</option>
-              <option value="bank_transfer">Bank Transfer (NEFT)</option>
-              <option value="other">Credit Ledger / Other</option>
-            </select>
-
-            {/* Date Range Selector */}
             <div className="flex flex-wrap items-center gap-2">
+              {/* Payment Method Selector */}
+              <select
+                value={methodFilter}
+                onChange={(e) => setMethodFilter(e.target.value)}
+                className="py-2 px-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-700 dark:text-slate-300 focus:outline-none"
+              >
+                <option value="all">All Payment Methods</option>
+                <option value="upi">UPI / QR Code</option>
+                <option value="cash">Cash Counter</option>
+                <option value="bank_transfer">Bank Transfer (NEFT)</option>
+                <option value="other">Credit Ledger / Other</option>
+              </select>
+
+              {/* Date Range Selector */}
               <select
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
@@ -488,21 +618,48 @@ export const SalesModule = () => {
             </div>
           </div>
 
-          {/* Payment Status Ledger Filter Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs w-full lg:w-auto overflow-x-auto">
-            {['all', 'paid', 'unpaid', 'overdue'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setPaymentFilter(tab)}
-                className={`px-3 py-1.5 rounded-lg font-semibold capitalize whitespace-nowrap transition-all ${
-                  paymentFilter === tab
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-              >
-                {tab === 'all' ? 'All Invoices' : tab}
-              </button>
-            ))}
+          {/* Filter Tabs Row: Payment & Delivery */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+            {/* Payment Status Filter */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs overflow-x-auto">
+              <span className="text-[10px] font-bold text-slate-400 px-2 uppercase">Payment:</span>
+              {['all', 'paid', 'unpaid', 'overdue'].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setPaymentFilter(tab)}
+                  className={`px-3 py-1 rounded-lg font-semibold capitalize whitespace-nowrap transition-all ${
+                    paymentFilter === tab
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {tab === 'all' ? 'All' : tab}
+                </button>
+              ))}
+            </div>
+
+            {/* Delivery Status Filter */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs overflow-x-auto">
+              <span className="text-[10px] font-bold text-slate-400 px-2 uppercase">Delivery:</span>
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'delivered', label: '✅ Delivered' },
+                { id: 'out_for_delivery', label: '🚚 Out for Delivery' },
+                { id: 'pending', label: '⏳ Pending' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setDeliveryFilter(tab.id)}
+                  className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition-all ${
+                    deliveryFilter === tab.id
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
         </CardHeader>
 
@@ -512,7 +669,8 @@ export const SalesModule = () => {
               <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                 <th className="py-3 px-4">Invoice & Order Type</th>
                 <th className="py-3 px-4">Client Company / Retailer</th>
-                <th className="py-3 px-4">Status & Terms</th>
+                <th className="py-3 px-4">Payment & Terms</th>
+                <th className="py-3 px-4">Delivery & Fulfillment</th>
                 <th className="py-3 px-4">Invoice Amount</th>
                 <th className="py-3 px-4">Items / Volume</th>
                 <th className="py-3 px-4 text-right">Commercial Actions</th>
@@ -542,14 +700,15 @@ export const SalesModule = () => {
                           <p className="font-bold text-slate-800 dark:text-slate-200">
                             {cust ? (cust.company_name || cust.name) : (deal.customer_reference || 'Walk-in Buyer')}
                           </p>
-                          <p className="text-[10px] text-slate-400">
-                            {cust?.gstin ? `GSTIN: ${cust.gstin}` : (cust?.territory_route ? `Route: ${cust.territory_route}` : 'Counter Sale')}
+                          <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                            {cust?.location && <span>📍 {cust.location}</span>}
+                            <span>{cust?.gstin ? `GSTIN: ${cust.gstin}` : (cust?.territory_route ? `Route: ${cust.territory_route}` : 'Counter Sale')}</span>
                           </p>
                         </div>
                       </div>
                     </td>
 
-                    {/* Status & Terms */}
+                    {/* Payment Status & Terms */}
                     <td className="py-3 px-4">
                       <div className="space-y-1">
                         <span
@@ -569,6 +728,28 @@ export const SalesModule = () => {
                         <p className="text-[10px] text-slate-400 font-mono">
                           Terms: {deal.credit_terms || 'Net 30'} · {deal.payment_method?.toUpperCase() || 'UPI'}
                         </p>
+                      </div>
+                    </td>
+
+                    {/* Delivery & Fulfillment */}
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={deal.delivery_status || 'pending'}
+                          onChange={(e) => updateDeliveryStatus(deal, e.target.value)}
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-lg tracking-wider border cursor-pointer focus:outline-none transition-all ${
+                            deal.delivery_status === 'delivered'
+                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                              : deal.delivery_status === 'out_for_delivery'
+                              ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30'
+                              : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                          }`}
+                          title="Click to update delivery status"
+                        >
+                          <option value="pending">⏳ Pending Dispatch</option>
+                          <option value="out_for_delivery">🚚 Out for Delivery</option>
+                          <option value="delivered">✅ Delivered</option>
+                        </select>
                       </div>
                     </td>
 
@@ -644,8 +825,8 @@ export const SalesModule = () => {
               })}
               {!filteredDeals.length && (
                 <tr>
-                  <td colSpan="6" className="py-10 text-center text-xs text-slate-400">
-                    No sales transactions match the selected payment filter or search query.
+                  <td colSpan="7" className="py-10 text-center text-xs text-slate-400">
+                    No sales transactions match the selected filter or search query.
                   </td>
                 </tr>
               )}
@@ -667,6 +848,7 @@ export const SalesModule = () => {
         isOpen={modalMode === 'create' || modalMode === 'edit'}
         onClose={() => setModalMode(null)}
         title={modalMode === 'create' ? 'Generate Statutory B2B Tax Invoice' : 'Edit Sales Transaction'}
+        size="xl"
       >
         <form onSubmit={submitTransaction} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -689,30 +871,158 @@ export const SalesModule = () => {
 
           {modalMode === 'create' ? (
             <>
-              {/* B2B Client Selector with Real-time Credit Limit Telemetry */}
-              <div className="space-y-2 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 bg-slate-50/50 dark:bg-slate-800/40">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                  <span>Select B2B Client Account</span>
-                  {selectedCustDetails && (
-                    <span className="text-[10px] font-bold text-amber-400">
-                      Credit Bal: ₹{Number(selectedCustDetails.outstanding_balance || 0).toLocaleString('en-IN')} / Limit: ₹{Number(selectedCustDetails.credit_limit || 250000).toLocaleString('en-IN')}
-                    </span>
-                  )}
-                </label>
-                <select
-                  value={form.selectedCustomerId}
-                  onChange={(e) => setForm({ ...form, selectedCustomerId: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs text-slate-900 dark:text-slate-100"
-                >
-                  <option value="">Walk-in / Direct Retail Counter Sale</option>
-                  {(customers || []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.company_name || c.name} · GSTIN: {c.gstin || 'N/A'} · Route: {c.territory_route || 'Default'}
-                    </option>
-                  ))}
-                </select>
+              {/* B2B Client Selector with Inline Quick Create Option */}
+              <div className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 bg-slate-50/50 dark:bg-slate-800/40">
+                {!isQuickAddClientOpen ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Select B2B Client Account
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickAddClientOpen(true)}
+                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 transition-all hover:scale-105"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>+ Add New Client</span>
+                      </button>
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <select
+                      value={form.selectedCustomerId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const c = customers.find((cust) => cust.id === val);
+                        setForm({
+                          ...form,
+                          selectedCustomerId: val,
+                          creditTerms: c?.credit_terms || form.creditTerms
+                        });
+                      }}
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 font-medium"
+                    >
+                      <option value="">Walk-in / Direct Retail Counter Sale</option>
+                      {(customers || []).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.company_name || c.name} · GSTIN: {c.gstin || 'N/A'} · Loc: {c.location || 'N/A'} · Route: {c.territory_route || 'Default'}
+                        </option>
+                      ))}
+                    </select>
+
+                    {selectedCustDetails && (
+                      <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/50 text-xs grid grid-cols-2 sm:grid-cols-4 gap-2 animate-fade-in">
+                        <div>
+                          <p className="text-[10px] text-slate-500 uppercase font-semibold">Client Company</p>
+                          <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{selectedCustDetails.company_name || selectedCustDetails.name}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-500 uppercase font-semibold">GSTIN & Location</p>
+                          <p className="font-semibold text-slate-700 dark:text-slate-300 truncate">{selectedCustDetails.gstin || 'Unregistered'} · {selectedCustDetails.location || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-500 uppercase font-semibold">Credit Balance</p>
+                          <p className="font-bold text-amber-500">₹{Number(selectedCustDetails.outstanding_balance || 0).toLocaleString('en-IN')}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-500 uppercase font-semibold">Approved Limit</p>
+                          <p className="font-bold text-emerald-500">₹{Number(selectedCustDetails.credit_limit || 250000).toLocaleString('en-IN')}</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* Inline Quick Add Client Card */
+                  <div className="space-y-3 p-3.5 rounded-xl border-2 border-indigo-500/40 bg-white dark:bg-slate-900/80 shadow-md animate-fade-in">
+                    <div className="flex items-center justify-between pb-2 border-b border-indigo-100 dark:border-indigo-900/50">
+                      <div className="flex items-center gap-2">
+                        <UserPlus className="w-4 h-4 text-indigo-500" />
+                        <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                          Quick Register New B2B Client
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickAddClientOpen(false)}
+                        className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-semibold"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <Input
+                        id="quickClientCompany"
+                        label="Company / Shop Name *"
+                        placeholder="e.g. Apex Wholesalers & Retail Pvt Ltd"
+                        value={newClientForm.company_name}
+                        onChange={(e) => setNewClientForm({ ...newClientForm, company_name: e.target.value, name: e.target.value })}
+                        required
+                      />
+                      <Input
+                        id="quickClientGstin"
+                        label="GSTIN Number"
+                        placeholder="e.g. 27AAAAA0000A1Z5"
+                        value={newClientForm.gstin}
+                        onChange={(e) => setNewClientForm({ ...newClientForm, gstin: e.target.value })}
+                      />
+                      <Input
+                        id="quickClientPhone"
+                        label="Contact Phone"
+                        placeholder="+91 98765 43210"
+                        value={newClientForm.contact_phone}
+                        onChange={(e) => setNewClientForm({ ...newClientForm, contact_phone: e.target.value })}
+                      />
+                      <Input
+                        id="quickClientLocation"
+                        label="Location / City / Address *"
+                        placeholder="e.g. Surat Wholesale Market, Gujarat"
+                        value={newClientForm.location}
+                        onChange={(e) => setNewClientForm({ ...newClientForm, location: e.target.value })}
+                        required
+                      />
+                      <Input
+                        id="quickClientLimit"
+                        label="Approved Credit Limit (₹)"
+                        type="number"
+                        placeholder="250000"
+                        value={newClientForm.credit_limit}
+                        onChange={(e) => setNewClientForm({ ...newClientForm, credit_limit: e.target.value })}
+                      />
+                      <Input
+                        id="quickClientRoute"
+                        label="Territory Route"
+                        placeholder="e.g. North Commercial Hub"
+                        value={newClientForm.territory_route}
+                        onChange={(e) => setNewClientForm({ ...newClientForm, territory_route: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsQuickAddClientOpen(false)}
+                      >
+                        Back to Client List
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        icon={CheckCircle2}
+                        isLoading={isCreatingClient}
+                        onClick={handleQuickCreateClient}
+                      >
+                        Save & Select Client
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Commercial Terms & Delivery Status Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                   <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
                     Payment Method
                     <select
@@ -733,6 +1043,18 @@ export const SalesModule = () => {
                     onChange={(e) => setForm({ ...form, creditTerms: e.target.value })}
                     placeholder="Net 30"
                   />
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    Order Delivery Status
+                    <select
+                      value={form.deliveryStatus}
+                      onChange={(e) => setForm({ ...form, deliveryStatus: e.target.value })}
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900 font-semibold"
+                    >
+                      <option value="pending">⏳ Pending Dispatch</option>
+                      <option value="out_for_delivery">🚚 Out for Delivery</option>
+                      <option value="delivered">✅ Delivered</option>
+                    </select>
+                  </label>
                 </div>
               </div>
 
@@ -869,7 +1191,7 @@ export const SalesModule = () => {
               </div>
             </>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <Input
                 id="transactionAmount"
                 label="Amount"
@@ -896,6 +1218,18 @@ export const SalesModule = () => {
                   <option value="paid">Paid</option>
                   <option value="unpaid">Unpaid / Credit</option>
                   <option value="overdue">Overdue</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                Delivery Status
+                <select
+                  value={form.deliveryStatus}
+                  onChange={(e) => setForm({ ...form, deliveryStatus: e.target.value })}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900"
+                >
+                  <option value="pending">⏳ Pending Dispatch</option>
+                  <option value="out_for_delivery">🚚 Out for Delivery</option>
+                  <option value="delivered">✅ Delivered</option>
                 </select>
               </label>
             </div>
@@ -965,15 +1299,15 @@ export const SalesModule = () => {
                   <div>
                     <p className="font-black text-[9px] uppercase tracking-wider text-slate-700">BILLED TO CLIENT:</p>
                     <p className="font-bold text-xs uppercase">{custName}</p>
-                    <p className="text-[10px]">GSTIN: <span className="font-bold">{cust?.gstin || 'N/A'}</span></p>
-                    <p className="text-[10px]">Route: {cust?.territory_route || 'Direct Route'}</p>
+                    <p className="text-[10px]">Location: <span className="font-bold">{cust?.location || 'Registered Facility'}</span></p>
+                    <p className="text-[10px]">GSTIN: <span className="font-bold">{cust?.gstin || 'N/A'}</span> · Route: {cust?.territory_route || 'Direct Route'}</p>
                   </div>
 
                   <div className="text-right">
-                    <p className="font-black text-[9px] uppercase tracking-wider text-slate-700">COMMERCIAL LEDGER:</p>
-                    <p className="text-[10px]">Status: <span className="font-bold uppercase text-black">[{selected.payment_status || 'PAID'}]</span></p>
-                    <p className="text-[10px]">Method: <span className="font-bold">{selected.payment_method?.toUpperCase() || 'UPI'}</span></p>
-                    <p className="text-[10px]">Terms: {selected.credit_terms || 'Net 30'}</p>
+                    <p className="font-black text-[9px] uppercase tracking-wider text-slate-700">COMMERCIAL & LOGISTICS:</p>
+                    <p className="text-[10px]">Payment: <span className="font-bold uppercase text-black">[{selected.payment_status || 'PAID'}]</span> ({selected.payment_method?.toUpperCase() || 'UPI'})</p>
+                    <p className="text-[10px]">Delivery: <span className="font-bold uppercase text-indigo-700">[{selected.delivery_status === 'delivered' ? 'DELIVERED' : selected.delivery_status === 'out_for_delivery' ? 'OUT FOR DELIVERY' : 'PENDING DISPATCH'}]</span></p>
+                    <p className="text-[10px]">Credit Terms: {selected.credit_terms || 'Net 30'}</p>
                   </div>
                 </div>
 

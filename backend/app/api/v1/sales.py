@@ -151,11 +151,15 @@ def create_transaction(
         customer = None
         customer_snapshot = None
         if payload.customer_reference:
+            from sqlalchemy import or_
             customer = db.scalar(
                 select(Customer)
                 .where(
                     Customer.tenant_id == user.tenant_id,
-                    Customer.external_customer_id == payload.customer_reference.strip(),
+                    or_(
+                        Customer.external_customer_id == payload.customer_reference.strip(),
+                        Customer.company_name == payload.customer_reference.strip(),
+                    ),
                 )
                 .order_by(Customer.created_at)
                 .limit(1)
@@ -167,6 +171,7 @@ def create_transaction(
                     assigned_seller_id=user.id,
                     source_system="manual_pos",
                     external_customer_id=payload.customer_reference.strip(),
+                    company_name=payload.customer_reference.strip(),
                     last_purchase=occurred_at,
                     order_count=0,
                     item_quantity=0,
@@ -175,14 +180,26 @@ def create_transaction(
                 )
                 db.add(customer)
                 db.flush()
-                customer_snapshot = {"created": True}
+                customer_snapshot = {
+                    "created": True,
+                    "company_name": customer.company_name,
+                    "gstin": customer.gstin,
+                    "location": customer.location,
+                    "contact_phone": customer.contact_phone,
+                    "territory_route": customer.territory_route,
+                }
             else:
                 customer_snapshot = {
                     "created": False,
+                    "company_name": customer.company_name or customer.external_customer_id,
+                    "gstin": customer.gstin,
+                    "location": customer.location,
+                    "contact_phone": customer.contact_phone,
+                    "territory_route": customer.territory_route,
                     "assigned_seller_id": (
                         str(customer.assigned_seller_id) if customer.assigned_seller_id else None
                     ),
-                    "last_purchase": customer.last_purchase.isoformat(),
+                    "last_purchase": customer.last_purchase.isoformat() if customer.last_purchase else None,
                     "order_count": customer.order_count,
                     "item_quantity": customer.item_quantity,
                     "total_revenue": str(customer.total_revenue),
@@ -204,6 +221,8 @@ def create_transaction(
             discount_amount=payload.order_discount,
             tax_amount=payload.tax_amount,
             payment_method=payload.payment_method,
+            payment_status=payload.payment_status or "paid",
+            delivery_status=payload.delivery_status or "pending",
             customer_id=customer.id if customer else None,
             customer_snapshot=customer_snapshot,
         )
@@ -245,6 +264,8 @@ def create_transaction(
             total_amount=payload.total_amount,
             item_count=payload.item_count,
             status=TransactionStatus.COMPLETED,
+            payment_status=payload.payment_status or "paid",
+            delivery_status=payload.delivery_status or "pending",
             notes=payload.notes,
         )
         db.add(transaction)

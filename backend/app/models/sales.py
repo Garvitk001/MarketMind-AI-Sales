@@ -57,6 +57,7 @@ class SalesTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     igst_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     payment_method: Mapped[str | None] = mapped_column(String(60), index=True)
     payment_status: Mapped[str | None] = mapped_column(String(30), default="paid", index=True)
+    delivery_status: Mapped[str | None] = mapped_column(String(30), default="pending", index=True)
     credit_terms: Mapped[str | None] = mapped_column(String(50), default="Net 30")
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     hsn_code: Mapped[str | None] = mapped_column(String(30), default="8471")

@@ -83,7 +83,7 @@ export const B2bInvoiceModal = ({ isOpen, onClose, transaction, customer }) => {
         
         {/* Top Control Bar (Hidden in Print) */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-300 dark:border-slate-800 no-print">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className={`text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 border ${
               transaction.payment_status === 'overdue' ? 'bg-rose-500/15 text-rose-600 border-rose-500/30' :
               transaction.payment_status === 'unpaid' ? 'bg-amber-500/15 text-amber-600 border-amber-500/30' :
@@ -94,6 +94,16 @@ export const B2bInvoiceModal = ({ isOpen, onClose, transaction, customer }) => {
               {transaction.payment_status === 'paid' && <CheckCircle2 className="w-3.5 h-3.5" />}
               <span>{transaction.payment_status === 'overdue' ? 'OVERDUE PAYMENT' : transaction.payment_status === 'unpaid' ? 'UNPAID CREDIT' : 'PAID TAX INVOICE'}</span>
             </span>
+
+            <span className={`text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 border ${
+              transaction.delivery_status === 'delivered' ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' :
+              transaction.delivery_status === 'out_for_delivery' ? 'bg-blue-500/15 text-blue-600 border-blue-500/30' :
+              'bg-amber-500/15 text-amber-600 border-amber-500/30'
+            }`}>
+              <Truck className="w-3.5 h-3.5" />
+              <span>{transaction.delivery_status === 'delivered' ? 'DELIVERED' : transaction.delivery_status === 'out_for_delivery' ? 'OUT FOR DELIVERY' : 'PENDING DISPATCH'}</span>
+            </span>
+
             <span className="text-[11px] text-slate-600 dark:text-slate-400 font-sans">
               Format: <strong>A5 Paper (Landscape 210x148mm)</strong>
             </span>
@@ -139,8 +149,9 @@ export const B2bInvoiceModal = ({ isOpen, onClose, transaction, customer }) => {
             <div className="text-right">
               <p className="font-black text-[9px] uppercase tracking-wider text-slate-700">DISPATCH & LEDGER DETAILS:</p>
               <p className="text-[10px]">Payment Method: <span className="font-bold">{transaction.payment_method?.toUpperCase() || 'UPI / BANK'}</span></p>
+              <p className="text-[10px]">Delivery: <span className="font-bold uppercase text-black">[{transaction.delivery_status === 'delivered' ? 'DELIVERED' : transaction.delivery_status === 'out_for_delivery' ? 'OUT FOR DELIVERY' : 'PENDING DISPATCH'}]</span></p>
               <p className="text-[10px]">Credit Terms: <span className="font-bold">{transaction.credit_terms || 'Net 30 Days'}</span></p>
-              <p className="text-[10px]">Status: <span className="font-bold text-black uppercase">[{transaction.payment_status || 'PAID'}]</span></p>
+              <p className="text-[10px]">Payment Status: <span className="font-bold text-black uppercase">[{transaction.payment_status || 'PAID'}]</span></p>
             </div>
           </div>
 

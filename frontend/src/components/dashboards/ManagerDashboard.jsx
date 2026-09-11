@@ -89,7 +89,29 @@ export const ManagerDashboard = () => {
   const { profile, api } = useAuth();
   const { addToast } = useToast();
   const { t } = useLanguage();
-  const { inventorySummary, inventoryItems: liveInventoryItems, refresh, purchaseOrders = [], createPurchaseOrder, deletePurchaseOrder } = useData();
+  const { inventorySummary, inventoryItems: liveInventoryItems, refresh, purchaseOrders = [], createPurchaseOrder, deletePurchaseOrder, salesTransactions = [] } = useData();
+
+  const storeDeliveryStats = useMemo(() => {
+    const deals = salesTransactions || [];
+    const delivered = deals.filter((d) => d.delivery_status === 'delivered');
+    const outForDelivery = deals.filter((d) => d.delivery_status === 'out_for_delivery');
+    const pending = deals.filter((d) => !d.delivery_status || d.delivery_status === 'pending');
+
+    const deliveredVal = delivered.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
+    const outForDeliveryVal = outForDelivery.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
+    const pendingVal = pending.reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
+
+    return {
+      deliveredCount: delivered.length,
+      deliveredVal,
+      outForDeliveryCount: outForDelivery.length,
+      outForDeliveryVal,
+      pendingCount: pending.length,
+      pendingVal,
+      totalCount: deals.length,
+      fulfillmentRate: deals.length > 0 ? Math.round((delivered.length / deals.length) * 100) : 100
+    };
+  }, [salesTransactions]);
 
   const [stores, setStores] = useState([]);
   const [storeFilter, setStoreFilter] = useState('all');
@@ -659,6 +681,75 @@ export const ManagerDashboard = () => {
           </div>
         </Card>
       </div>
+
+      {/* Store Order Delivery & Dispatch Tracking */}
+      <Card hoverEffect={false} className="border-blue-100 dark:border-blue-900/30">
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="w-5 h-5 text-blue-500" />
+                <span>{t('Store Order Delivery & Dispatch Tracking')}</span>
+                <Badge variant="info">{t('Logistics')}</Badge>
+              </CardTitle>
+              <CardDescription>{t('Tracking order dispatches, active deliveries, and fulfillment rates for your store')}</CardDescription>
+            </div>
+            <div className="text-xs font-bold px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 border border-blue-200 dark:border-blue-800">
+              {t('Fulfillment Rate:')} <strong className="text-emerald-500">{storeDeliveryStats.fulfillmentRate}%</strong>
+            </div>
+          </div>
+        </CardHeader>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 uppercase">
+                <CheckCircle2 className="w-4 h-4" />
+                {t('Delivered')}
+              </span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500">
+                {storeDeliveryStats.deliveredCount} Orders
+              </span>
+            </div>
+            <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
+              ₹{storeDeliveryStats.deliveredVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Fulfilled and delivered to clients</p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 uppercase">
+                <Truck className="w-4 h-4" />
+                {t('Out for Delivery')}
+              </span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                {storeDeliveryStats.outForDeliveryCount} Orders
+              </span>
+            </div>
+            <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-2">
+              ₹{storeDeliveryStats.outForDeliveryVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">In transit on route with field staff</p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 uppercase">
+                <Clock className="w-4 h-4" />
+                {t('Pending Dispatch')}
+              </span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-500">
+                {storeDeliveryStats.pendingCount} Orders
+              </span>
+            </div>
+            <p className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-2">
+              ₹{storeDeliveryStats.pendingVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Invoiced & awaiting warehouse dispatch</p>
+          </div>
+        </div>
+      </Card>
 
       {/* Store Sales Staff Performance & Daily Target Tracker */}
       <Card hoverEffect={false}>

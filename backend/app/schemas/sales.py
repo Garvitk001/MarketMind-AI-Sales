@@ -29,6 +29,8 @@ class SalesTransactionCreate(BaseModel):
         max_length=30,
         pattern="^(cash|upi|card|bank_transfer|other)$",
     )
+    payment_status: str | None = Field(default="paid", max_length=30)
+    delivery_status: str | None = Field(default="pending", max_length=30)
     customer_reference: str | None = Field(default=None, max_length=80)
     notes: str | None = Field(default=None, max_length=500)
 
@@ -56,6 +58,7 @@ class SalesTransactionUpdate(BaseModel):
     total_amount: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2)
     item_count: int | None = Field(default=None, gt=0, le=10000)
     payment_status: str | None = Field(default=None, max_length=30)
+    delivery_status: str | None = Field(default=None, max_length=30)
     customer_id: UUID | None = None
     notes: str | None = Field(default=None, max_length=500)
 
@@ -98,6 +101,7 @@ class SalesTransactionResponse(ORMModel):
     igst_amount: Decimal | None = None
     payment_method: str | None
     payment_status: str | None = None
+    delivery_status: str | None = "pending"
     credit_terms: str | None = None
     due_date: datetime | None = None
     hsn_code: str | None = None
