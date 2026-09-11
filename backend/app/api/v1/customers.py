@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.api.dependencies import DBSession, require_permissions
 from app.core.permissions import Permissions
@@ -192,8 +192,20 @@ def delete_customer(
     db: DBSession,
     user: User = Depends(customer_reader),
 ):
-    # Only Store Manager, Owner, or Admin can delete client accounts
-    if user.role.code not in {RoleCode.STORE_MANAGER, RoleCode.OWNER, RoleCode.ADMIN}:
+    # Only Store Manager, Business Owner, or Administrator can delete client accounts
+    allowed_roles = {
+        RoleCode.STORE_MANAGER,
+        RoleCode.BUSINESS_OWNER,
+        RoleCode.ADMINISTRATOR,
+        "store_manager",
+        "business_owner",
+        "owner",
+        "manager",
+        "administrator",
+        "admin",
+    }
+    user_role = str(user.role.code).lower() if (user.role and user.role.code) else ""
+    if user.role.code not in allowed_roles and user_role not in allowed_roles:
         raise HTTPException(
             status_code=403,
             detail="Only Store Managers and Business Owners are permitted to delete client accounts.",
@@ -217,9 +229,16 @@ def delete_customer(
         )
 
     client_name = customer.company_name or customer.external_customer_id
+
+    # Unlink transactions to preserve transaction history
+    db.execute(
+        update(SalesTransaction)
+        .where(SalesTransaction.customer_id == customer.id)
+        .values(customer_id=None)
+    )
     db.delete(customer)
     db.commit()
-    return MessageResponse(message=f"Client '{client_name}' was successfully deleted.")
+    return MessageResponse(message=f"Client '{client_name}' deleted successfully.")
 
 
 @router.get("/{customer_id}/insights", response_model=CustomerInsightResponse)

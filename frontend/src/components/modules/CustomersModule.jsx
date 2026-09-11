@@ -47,7 +47,7 @@ const number = (value, digits = 1) =>
 const csvValue = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
 
 export const CustomersModule = () => {
-  const { api, access, currentRole } = useAuth();
+  const { api, access, currentRole, profile } = useAuth();
   const { addToast } = useToast();
   const { t } = useLanguage();
   const { customerSegmentSummary: summary, isLoading: sharedLoading, refresh } = useData();
@@ -261,7 +261,11 @@ export const CustomersModule = () => {
     }
   };
 
-  const canDeleteClient = currentRole?.id === 'manager' || currentRole?.id === 'owner' || profile?.role?.code === 'store_manager' || profile?.role?.code === 'owner';
+  const canDeleteClient =
+    currentRole?.id === 'manager' ||
+    currentRole?.id === 'owner' ||
+    currentRole?.id === 'admin' ||
+    ['store_manager', 'business_owner', 'owner', 'manager', 'administrator', 'admin'].includes(profile?.role?.code?.toLowerCase?.());
 
   const handleRegisterClient = async (e) => {
     e.preventDefault();
