@@ -17,7 +17,8 @@ import {
   TrendingUp,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  Edit3
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
@@ -75,11 +76,27 @@ export const CustomersModule = () => {
     contactPerson: '',
     contactPhone: '',
     contactEmail: '',
+    location: '',
     creditLimit: '250000',
     creditTerms: 'Net 30',
     territoryRoute: 'Central Wholesale Route'
   });
   const [isRegistering, setIsRegistering] = useState(false);
+
+  // Edit Client Info Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editClientForm, setEditClientForm] = useState({
+    companyName: '',
+    gstin: '',
+    contactPhone: '',
+    contactEmail: '',
+    location: '',
+    creditLimit: '250000',
+    outstandingBalance: '0',
+    creditTerms: 'Net 30',
+    territoryRoute: 'Central Wholesale Route'
+  });
+  const [isUpdatingClient, setIsUpdatingClient] = useState(false);
 
   // Record Collection Payment Modal State
   const [paymentCustomer, setPaymentCustomer] = useState(null);
@@ -208,23 +225,36 @@ export const CustomersModule = () => {
 
     try {
       const amt = Number(paymentAmount);
-      const updatedItems = items.map((i) => {
-        if (i.customer_id === paymentCustomer.customer_id) {
-          const currentBal = Number(i.outstanding_balance || Number(i.total_revenue || 0) * 0.15);
-          const newBal = Math.max(0, currentBal - amt);
-          return { ...i, outstanding_balance: newBal };
-        }
-        return i;
+      const currentBal = Number(paymentCustomer.outstanding_balance || Number(paymentCustomer.total_revenue || 0) * 0.15);
+      const newBal = Math.max(0, currentBal - amt);
+
+      const targetId = paymentCustomer.customer_id || paymentCustomer.id;
+      await api(`/customers/${targetId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ outstanding_balance: newBal })
       });
 
-      setItems(updatedItems);
+      setItems((prev) =>
+        prev.map((i) => {
+          if ((i.customer_id || i.id) === targetId) {
+            return { ...i, outstanding_balance: newBal };
+          }
+          return i;
+        })
+      );
+
+      if (selected && (selected.customer_id || selected.id) === targetId) {
+        setSelected((prev) => ({ ...prev, outstanding_balance: newBal }));
+      }
+
       addToast(
-        `Payment of ${money(amt)} recorded for ${paymentCustomer.company_name || paymentCustomer.external_customer_id}! Outstanding balance updated.`,
+        `Payment of ${money(amt)} recorded for ${paymentCustomer.company_name || paymentCustomer.external_customer_id}! Ledger updated in DB.`,
         'success'
       );
       setPaymentCustomer(null);
+      refresh();
     } catch (err) {
-      addToast('Failed to record customer collection payment.', 'danger');
+      addToast(err.message || 'Failed to record customer collection payment.', 'danger');
     } finally {
       setIsRecordingPayment(false);
     }
@@ -235,28 +265,35 @@ export const CustomersModule = () => {
     setIsRegistering(true);
 
     try {
-      const newId = `CUST-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newClient = {
-        customer_id: newId,
-        id: newId,
-        external_customer_id: newId,
+      const payload = {
         company_name: newClientForm.companyName.trim(),
         gstin: newClientForm.gstin.trim() || '27AAAAA0000A1Z5',
         contact_phone: newClientForm.contactPhone.trim() || '+91 98765 43210',
         contact_email: newClientForm.contactEmail.trim() || 'billing@partner.in',
-        credit_limit: Number(newClientForm.creditLimit),
-        outstanding_balance: 0,
-        credit_terms: newClientForm.creditTerms,
-        territory_route: newClientForm.territoryRoute,
+        location: newClientForm.location.trim() || 'Central Commercial Market',
+        credit_limit: Number(newClientForm.creditLimit) || 250000,
+        credit_terms: newClientForm.creditTerms || 'Net 30',
+        territory_route: newClientForm.territoryRoute || 'Central Wholesale Route'
+      };
+
+      const savedCust = await api('/customers', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      const formatted = {
+        ...savedCust,
+        customer_id: savedCust.id,
         segment_name: 'VIP Wholesale Buyer',
         total_revenue: 0,
         order_count: 0,
-        recency_days: 0
+        recency_days: 0,
+        average_order_value: 0
       };
 
-      setItems([newClient, ...items]);
+      setItems((prev) => [formatted, ...prev]);
       setTotal((t) => t + 1);
-      addToast(`New B2B Client "${newClientForm.companyName}" registered successfully!`, 'success');
+      addToast(`New B2B Client "${payload.company_name}" registered & saved to database!`, 'success');
       setIsAddModalOpen(false);
       setNewClientForm({
         companyName: '',
@@ -264,14 +301,80 @@ export const CustomersModule = () => {
         contactPerson: '',
         contactPhone: '',
         contactEmail: '',
+        location: '',
         creditLimit: '250000',
         creditTerms: 'Net 30',
         territoryRoute: 'Central Wholesale Route'
       });
+      refresh();
     } catch (err) {
-      addToast('Failed to register client account.', 'danger');
+      addToast(err.message || 'Failed to register client account.', 'danger');
     } finally {
       setIsRegistering(false);
+    }
+  };
+
+  const handleOpenEditModal = (client) => {
+    setEditClientForm({
+      companyName: client.company_name || client.external_customer_id || '',
+      gstin: client.gstin || '',
+      contactPhone: client.contact_phone || '',
+      contactEmail: client.contact_email || '',
+      location: client.location || '',
+      creditLimit: String(client.credit_limit || 250000),
+      outstandingBalance: String(client.outstanding_balance || 0),
+      creditTerms: client.credit_terms || 'Net 30',
+      territoryRoute: client.territory_route || 'Central Wholesale Route'
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateClient = async (e) => {
+    e.preventDefault();
+    if (!selected) return;
+    setIsUpdatingClient(true);
+
+    try {
+      const targetId = selected.customer_id || selected.id;
+      const payload = {
+        company_name: editClientForm.companyName.trim(),
+        gstin: editClientForm.gstin.trim() || null,
+        contact_phone: editClientForm.contactPhone.trim() || null,
+        contact_email: editClientForm.contactEmail.trim() || null,
+        location: editClientForm.location.trim() || null,
+        credit_limit: Number(editClientForm.creditLimit),
+        outstanding_balance: Number(editClientForm.outstandingBalance),
+        credit_terms: editClientForm.creditTerms,
+        territory_route: editClientForm.territoryRoute.trim() || null,
+      };
+
+      const updated = await api(`/customers/${targetId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      });
+
+      const updatedFormatted = {
+        ...selected,
+        ...updated,
+        customer_id: updated.id || selected.customer_id,
+      };
+
+      setSelected(updatedFormatted);
+      setItems((prev) =>
+        prev.map((i) =>
+          (i.customer_id || i.id) === targetId
+            ? { ...i, ...updatedFormatted }
+            : i
+        )
+      );
+
+      addToast(`Client details for "${payload.company_name}" updated successfully!`, 'success');
+      setIsEditModalOpen(false);
+      refresh();
+    } catch (err) {
+      addToast(err.message || 'Failed to update client profile.', 'danger');
+    } finally {
+      setIsUpdatingClient(false);
     }
   };
 
@@ -552,13 +655,17 @@ export const CustomersModule = () => {
 
                   return (
                     <tr key={item.customer_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      {/* Client Company & GSTIN */}
+                      {/* Client Company & GSTIN & Location */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <Building2 className="w-4 h-4 text-indigo-400 shrink-0" />
                           <div>
                             <p className="font-bold text-slate-900 dark:text-slate-100">{company}</p>
                             <p className="text-[10px] text-indigo-400 font-mono">GSTIN: {gstinVal}</p>
+                            <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="truncate">{item.location || 'Central Commercial Market'}</span>
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -686,6 +793,25 @@ export const CustomersModule = () => {
             />
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              id="clientEmail"
+              label="Billing / Contact Email"
+              type="email"
+              placeholder="billing@partner.in"
+              value={newClientForm.contactEmail}
+              onChange={(e) => setNewClientForm({ ...newClientForm, contactEmail: e.target.value })}
+            />
+            <Input
+              id="clientLocation"
+              label="Client Location / Address"
+              placeholder="e.g. Sector 18 Wholesale Market, Pune"
+              value={newClientForm.location}
+              onChange={(e) => setNewClientForm({ ...newClientForm, location: e.target.value })}
+              required
+            />
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input
               id="clientCreditLimit"
@@ -703,6 +829,7 @@ export const CustomersModule = () => {
                 className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900 text-slate-900 dark:text-slate-100"
               >
                 <option value="Net 30">Net 30 Days</option>
+                <option value="Net 45">Net 45 Days</option>
                 <option value="Net 60">Net 60 Days</option>
                 <option value="COD">COD (Cash on Delivery)</option>
               </select>
@@ -721,6 +848,100 @@ export const CustomersModule = () => {
             </Button>
             <Button type="submit" variant="primary" isLoading={isRegistering}>
               Register Client Account
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Client Info Modal */}
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit B2B Client Details">
+        <form onSubmit={handleUpdateClient} className="space-y-4">
+          <Input
+            id="editCompanyName"
+            label="Client Company / Store Name"
+            value={editClientForm.companyName}
+            onChange={(e) => setEditClientForm({ ...editClientForm, companyName: e.target.value })}
+            required
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              id="editGstin"
+              label="GSTIN Number"
+              value={editClientForm.gstin}
+              onChange={(e) => setEditClientForm({ ...editClientForm, gstin: e.target.value })}
+            />
+            <Input
+              id="editPhone"
+              label="Contact Phone"
+              value={editClientForm.contactPhone}
+              onChange={(e) => setEditClientForm({ ...editClientForm, contactPhone: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              id="editEmail"
+              label="Billing / Contact Email"
+              type="email"
+              value={editClientForm.contactEmail}
+              onChange={(e) => setEditClientForm({ ...editClientForm, contactEmail: e.target.value })}
+            />
+            <Input
+              id="editLocation"
+              label="Client Location / Address"
+              placeholder="e.g. Bhiwandi Logistics Park, Mumbai"
+              value={editClientForm.location}
+              onChange={(e) => setEditClientForm({ ...editClientForm, location: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Input
+              id="editCreditLimit"
+              label="Approved Credit Limit (₹)"
+              type="number"
+              value={editClientForm.creditLimit}
+              onChange={(e) => setEditClientForm({ ...editClientForm, creditLimit: e.target.value })}
+              required
+            />
+            <Input
+              id="editOutstandingBalance"
+              label="Outstanding Balance (₹)"
+              type="number"
+              value={editClientForm.outstandingBalance}
+              onChange={(e) => setEditClientForm({ ...editClientForm, outstandingBalance: e.target.value })}
+              required
+            />
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+              Payment Terms
+              <select
+                value={editClientForm.creditTerms}
+                onChange={(e) => setEditClientForm({ ...editClientForm, creditTerms: e.target.value })}
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+              >
+                <option value="Net 30">Net 30 Days</option>
+                <option value="Net 45">Net 45 Days</option>
+                <option value="Net 60">Net 60 Days</option>
+                <option value="COD">COD (Cash on Delivery)</option>
+              </select>
+            </label>
+          </div>
+
+          <Input
+            id="editRoute"
+            label="Territory Route"
+            value={editClientForm.territoryRoute}
+            onChange={(e) => setEditClientForm({ ...editClientForm, territoryRoute: e.target.value })}
+          />
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="ghost" onClick={() => setIsEditModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" isLoading={isUpdatingClient}>
+              Save Client Changes
             </Button>
           </div>
         </form>
@@ -791,6 +1012,32 @@ export const CustomersModule = () => {
         {insightLoading && <p className="py-10 text-center text-sm text-slate-500">Building customer profile timeline from linked sales…</p>}
         {selected && insight && (
           <div className="space-y-5 text-xs">
+            {/* Top Action Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 gap-3">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-indigo-400 shrink-0" />
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                    {selected.company_name || selected.external_customer_id}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-slate-400" />
+                    <span>{selected.location || insight.location || 'Central Commercial Market'}</span>
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Edit3}
+                onClick={() => handleOpenEditModal(selected)}
+                className="shadow-md text-xs font-semibold shrink-0"
+              >
+                {t('Edit Client Info')}
+              </Button>
+            </div>
+
             <div
               className={`rounded-xl border p-4 ${
                 ['decreasing', 'inactive'].includes(insight.decline_status)
@@ -811,6 +1058,8 @@ export const CustomersModule = () => {
               {[
                 ['Company Name', selected.company_name || selected.external_customer_id],
                 ['GSTIN Number', selected.gstin || '27AAAAA0000A1Z5'],
+                ['Client Location', selected.location || insight.location || 'Central Commercial Market'],
+                ['Territory Route', selected.territory_route || 'Central Wholesale Route'],
                 ['Lifetime Revenue', money(insight.total_revenue)],
                 ['Average Order Value', money(insight.average_order_value)],
                 ['Approved Credit Limit', money(selected.credit_limit || 250000)],

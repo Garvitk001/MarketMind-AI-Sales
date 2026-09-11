@@ -41,6 +41,15 @@ def _response(assignment: CustomerSegmentAssignment, customer: Customer):
     return CustomerSegmentResponse(
         customer_id=customer.id,
         external_customer_id=customer.external_customer_id,
+        company_name=customer.company_name,
+        gstin=customer.gstin,
+        contact_phone=customer.contact_phone,
+        contact_email=customer.contact_email,
+        location=customer.location,
+        credit_limit=customer.credit_limit,
+        outstanding_balance=customer.outstanding_balance,
+        credit_terms=customer.credit_terms,
+        territory_route=customer.territory_route,
         assigned_seller_id=customer.assigned_seller_id,
         segment_code=assignment.segment_code,
         segment_name=assignment.segment_name,
@@ -80,7 +89,16 @@ def _heuristic_segment_customer(customer: Customer) -> CustomerSegmentResponse:
 
     return CustomerSegmentResponse(
         customer_id=customer.id,
-        external_customer_id=customer.company_name or customer.external_customer_id,
+        external_customer_id=customer.external_customer_id,
+        company_name=customer.company_name,
+        gstin=customer.gstin,
+        contact_phone=customer.contact_phone,
+        contact_email=customer.contact_email,
+        location=customer.location,
+        credit_limit=customer.credit_limit,
+        outstanding_balance=customer.outstanding_balance,
+        credit_terms=customer.credit_terms,
+        territory_route=customer.territory_route,
         assigned_seller_id=customer.assigned_seller_id,
         segment_code=code,
         segment_name=name,
@@ -196,6 +214,8 @@ def list_customer_segments(
                 | (Customer.contact_email.ilike(search_pattern))
                 | (Customer.contact_phone.ilike(search_pattern))
                 | (Customer.gstin.ilike(search_pattern))
+                | (Customer.location.ilike(search_pattern))
+                | (Customer.territory_route.ilike(search_pattern))
             )
         total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
         rows = db.execute(
@@ -216,8 +236,6 @@ def list_customer_segments(
 
     # Heuristic dynamic RFM fallback
     cust_query = select(Customer).where(Customer.tenant_id == user.tenant_id)
-    if Permissions.DASHBOARD_SEGMENTS_ASSIGNED in user.permission_codes:
-        cust_query = cust_query.where(Customer.assigned_seller_id == user.id)
     if search:
         search_pattern = f"%{search.strip()}%"
         cust_query = cust_query.where(
@@ -226,6 +244,8 @@ def list_customer_segments(
             | (Customer.contact_email.ilike(search_pattern))
             | (Customer.contact_phone.ilike(search_pattern))
             | (Customer.gstin.ilike(search_pattern))
+            | (Customer.location.ilike(search_pattern))
+            | (Customer.territory_route.ilike(search_pattern))
         )
     all_custs = db.scalars(cust_query).all()
     all_items = [_heuristic_segment_customer(c) for c in all_custs]

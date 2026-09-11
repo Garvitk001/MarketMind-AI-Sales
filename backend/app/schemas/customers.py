@@ -7,6 +7,31 @@ from pydantic import BaseModel
 from app.schemas.common import ORMModel
 
 
+class CustomerCreate(BaseModel):
+    company_name: str
+    gstin: str | None = None
+    contact_phone: str | None = None
+    contact_email: str | None = None
+    location: str | None = None
+    credit_limit: Decimal | None = Decimal("250000.00")
+    credit_terms: str | None = "Net 30"
+    territory_route: str | None = "Central Commercial Route"
+    assigned_seller_id: UUID | None = None
+
+
+class CustomerUpdate(BaseModel):
+    company_name: str | None = None
+    gstin: str | None = None
+    contact_phone: str | None = None
+    contact_email: str | None = None
+    location: str | None = None
+    credit_limit: Decimal | None = None
+    outstanding_balance: Decimal | None = None
+    credit_terms: str | None = None
+    territory_route: str | None = None
+    assigned_seller_id: UUID | None = None
+
+
 class CustomerResponse(ORMModel):
     id: UUID
     tenant_id: UUID
@@ -22,6 +47,7 @@ class CustomerResponse(ORMModel):
     gstin: str | None = None
     contact_phone: str | None = None
     contact_email: str | None = None
+    location: str | None = None
     credit_limit: Decimal | None = None
     outstanding_balance: Decimal | None = None
     credit_terms: str | None = None
@@ -76,6 +102,15 @@ class CustomerPeriodComparison(BaseModel):
 class CustomerInsightResponse(BaseModel):
     customer_id: UUID
     external_customer_id: str
+    company_name: str | None = None
+    gstin: str | None = None
+    contact_phone: str | None = None
+    contact_email: str | None = None
+    location: str | None = None
+    credit_limit: Decimal | None = None
+    outstanding_balance: Decimal | None = None
+    credit_terms: str | None = None
+    territory_route: str | None = None
     assigned_seller_id: UUID | None
     first_visit: datetime | None
     last_visit: datetime | None

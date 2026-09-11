@@ -38,6 +38,8 @@ class Permissions:
     CUSTOMERS_READ_ALL = "customers.read.all"
     CUSTOMERS_READ_SUMMARY = "customers.read.summary"
     CUSTOMERS_READ_ASSIGNED = "customers.read.assigned"
+    CUSTOMERS_CREATE = "customers.create"
+    CUSTOMERS_UPDATE = "customers.update"
     USERS_READ = "users.read"
     USERS_MANAGE = "users.manage"
     ROLES_MANAGE = "roles.manage"
@@ -77,6 +79,8 @@ ROLE_DEFINITIONS: dict[RoleCode, dict[str, object]] = {
             Permissions.INVENTORY_READ_ALL,
             Permissions.INVENTORY_UPDATE_STORE,
             Permissions.CUSTOMERS_READ_ALL,
+            Permissions.CUSTOMERS_CREATE,
+            Permissions.CUSTOMERS_UPDATE,
             Permissions.INVOICES_READ,
             Permissions.REPORTS_EXPORT_BUSINESS,
             Permissions.USERS_READ,
@@ -101,6 +105,9 @@ ROLE_DEFINITIONS: dict[RoleCode, dict[str, object]] = {
             Permissions.INVENTORY_READ_STORE,
             Permissions.INVENTORY_UPDATE_STORE,
             Permissions.CUSTOMERS_READ_SUMMARY,
+            Permissions.CUSTOMERS_READ_ALL,
+            Permissions.CUSTOMERS_CREATE,
+            Permissions.CUSTOMERS_UPDATE,
             Permissions.INVOICES_READ,
             Permissions.REPORTS_EXPORT_OPERATIONAL,
         },
@@ -118,6 +125,9 @@ ROLE_DEFINITIONS: dict[RoleCode, dict[str, object]] = {
             Permissions.SALES_UPDATE_OWN,
             Permissions.INVOICES_MANAGE,
             Permissions.CUSTOMERS_READ_ASSIGNED,
+            Permissions.CUSTOMERS_READ_ALL,
+            Permissions.CUSTOMERS_CREATE,
+            Permissions.CUSTOMERS_UPDATE,
         },
     },
     RoleCode.ADMINISTRATOR: {

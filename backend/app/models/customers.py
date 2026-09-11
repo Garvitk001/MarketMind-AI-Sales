@@ -42,4 +42,5 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     outstanding_balance: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), default=0.00)
     credit_terms: Mapped[str | None] = mapped_column(String(50), default="Net 30")
     territory_route: Mapped[str | None] = mapped_column(String(150), default="Central Market Route")
+    location: Mapped[str | None] = mapped_column(String(255), default="Central Commercial Market")
 

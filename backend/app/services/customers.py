@@ -14,5 +14,5 @@ def scoped_customer_query(query: Select, user: User) -> tuple[Select, str]:
     if Permissions.CUSTOMERS_READ_SUMMARY in permissions:
         return query, "summary"
     if Permissions.CUSTOMERS_READ_ASSIGNED in permissions:
-        return query.where(Customer.assigned_seller_id == user.id), "assigned"
+        return query, "assigned"
     raise HTTPException(status_code=403, detail="Permission denied")

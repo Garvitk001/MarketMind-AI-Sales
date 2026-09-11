@@ -33,8 +33,9 @@ export const B2bInvoiceModal = ({ isOpen, onClose, transaction, customer }) => {
 
   const companyName = customer?.company_name || transaction.customer_snapshot?.company_name || transaction.customer_reference || 'Apex Wholesale & Retail Partner';
   const gstin = customer?.gstin || transaction.customer_snapshot?.gstin || '27AAAAA0000A1Z5';
-  const contactPhone = customer?.contact_phone || '+91 98765 43210';
-  const route = customer?.territory_route || 'Central Wholesale Route';
+  const contactPhone = customer?.contact_phone || transaction.customer_snapshot?.contact_phone || '+91 98765 43210';
+  const route = customer?.territory_route || transaction.customer_snapshot?.territory_route || 'Central Wholesale Route';
+  const location = customer?.location || transaction.customer_snapshot?.location || 'Central Commercial Market';
 
   const totalAmount = Number(transaction.total_amount || 0);
   const cgst = Number(transaction.cgst_amount || (totalAmount * 0.09));
@@ -131,6 +132,7 @@ export const B2bInvoiceModal = ({ isOpen, onClose, transaction, customer }) => {
               <p className="font-black text-[9px] uppercase tracking-wider text-slate-700">BILLED TO (RETAILER/BUYER):</p>
               <p className="font-bold text-xs uppercase">{companyName}</p>
               <p className="text-[10px]">GSTIN: <span className="font-bold">{gstin}</span></p>
+              <p className="text-[10px]">Location: <span className="font-bold">{location}</span></p>
               <p className="text-[10px]">Route: {route} | Ph: {contactPhone}</p>
             </div>
 

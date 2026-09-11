@@ -1,3 +1,4 @@
+import random
 from collections import Counter, defaultdict
 from datetime import timedelta
 from decimal import Decimal
@@ -14,12 +15,14 @@ from app.models.identity import RoleCode, Store, User
 from app.models.inventory import Product
 from app.models.sales import SalesLineItem, SalesTransaction, TransactionStatus
 from app.schemas.customers import (
+    CustomerCreate,
     CustomerInsightResponse,
     CustomerList,
     CustomerPeriodComparison,
     CustomerPreference,
     CustomerResponse,
     CustomerSummary,
+    CustomerUpdate,
     CustomerVisit,
 )
 from app.services.customers import scoped_customer_query
@@ -35,24 +38,9 @@ customer_reader = require_permissions(
 
 
 def _customer_for_insights(db: DBSession, user: User, customer_id: UUID) -> Customer | None:
-    customer = db.scalar(
+    return db.scalar(
         select(Customer).where(Customer.id == customer_id, Customer.tenant_id == user.tenant_id)
     )
-    if customer is None:
-        return None
-    if user.role.code in {RoleCode.BUSINESS_OWNER, RoleCode.ADMINISTRATOR}:
-        return customer
-    if user.role.code == RoleCode.SALES_EXECUTIVE:
-        return customer if customer.assigned_seller_id == user.id else None
-    if user.role.code == RoleCode.STORE_MANAGER and user.store_id:
-        visible = db.scalar(
-            select(SalesTransaction.id).where(
-                SalesTransaction.customer_id == customer.id,
-                SalesTransaction.store_id == user.store_id,
-            )
-        )
-        return customer if visible else None
-    return None
 
 
 @router.get("/summary", response_model=CustomerSummary)
@@ -88,17 +76,7 @@ def list_customers(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ):
-    if user.role.code == RoleCode.STORE_MANAGER:
-        customer_ids = select(SalesTransaction.customer_id).where(
-            SalesTransaction.tenant_id == user.tenant_id,
-            SalesTransaction.store_id == user.store_id,
-            SalesTransaction.customer_id.is_not(None),
-        )
-        query = select(Customer).where(
-            Customer.tenant_id == user.tenant_id, Customer.id.in_(customer_ids)
-        )
-    else:
-        query, _ = scoped_customer_query(select(Customer), user)
+    query, _ = scoped_customer_query(select(Customer), user)
     if search:
         search_pattern = f"%{search.strip()}%"
         query = query.where(
@@ -107,12 +85,99 @@ def list_customers(
             | (Customer.contact_email.ilike(search_pattern))
             | (Customer.contact_phone.ilike(search_pattern))
             | (Customer.gstin.ilike(search_pattern))
+            | (Customer.location.ilike(search_pattern))
+            | (Customer.territory_route.ilike(search_pattern))
         )
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     items = db.scalars(
-        query.order_by(Customer.total_revenue.desc()).limit(limit).offset(offset)
+        query.order_by(Customer.total_revenue.desc(), Customer.created_at.desc()).limit(limit).offset(offset)
     ).all()
     return CustomerList(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.post("", response_model=CustomerResponse, status_code=201)
+def create_customer(
+    payload: CustomerCreate,
+    db: DBSession,
+    user: User = Depends(customer_reader),
+):
+    ext_id = f"CUST-{random.randint(1000, 9999)}"
+    while db.scalar(
+        select(Customer.id).where(
+            Customer.tenant_id == user.tenant_id,
+            Customer.external_customer_id == ext_id,
+        )
+    ):
+        ext_id = f"CUST-{random.randint(1000, 9999)}"
+
+    seller_id = payload.assigned_seller_id or (
+        user.id if user.role.code == RoleCode.SALES_EXECUTIVE else None
+    )
+
+    customer = Customer(
+        tenant_id=user.tenant_id,
+        assigned_seller_id=seller_id,
+        source_system="marketmind_b2b",
+        external_customer_id=ext_id,
+        last_purchase=utcnow(),
+        order_count=0,
+        item_quantity=0,
+        total_revenue=Decimal("0.00"),
+        recency_days=0,
+        company_name=payload.company_name.strip(),
+        gstin=payload.gstin.strip() if payload.gstin else None,
+        contact_phone=payload.contact_phone.strip() if payload.contact_phone else None,
+        contact_email=payload.contact_email.strip() if payload.contact_email else None,
+        location=payload.location.strip() if payload.location else "Central Commercial Market",
+        credit_limit=payload.credit_limit or Decimal("250000.00"),
+        outstanding_balance=Decimal("0.00"),
+        credit_terms=payload.credit_terms or "Net 30",
+        territory_route=payload.territory_route or "Central Commercial Route",
+    )
+    db.add(customer)
+    db.commit()
+    db.refresh(customer)
+    return customer
+
+
+@router.patch("/{customer_id}", response_model=CustomerResponse)
+@router.put("/{customer_id}", response_model=CustomerResponse)
+def update_customer(
+    customer_id: UUID,
+    payload: CustomerUpdate,
+    db: DBSession,
+    user: User = Depends(customer_reader),
+):
+    customer = db.scalar(
+        select(Customer).where(Customer.id == customer_id, Customer.tenant_id == user.tenant_id)
+    )
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    if payload.company_name is not None:
+        customer.company_name = payload.company_name.strip()
+    if payload.gstin is not None:
+        customer.gstin = payload.gstin.strip() or None
+    if payload.contact_phone is not None:
+        customer.contact_phone = payload.contact_phone.strip() or None
+    if payload.contact_email is not None:
+        customer.contact_email = payload.contact_email.strip() or None
+    if payload.location is not None:
+        customer.location = payload.location.strip() or None
+    if payload.credit_limit is not None:
+        customer.credit_limit = payload.credit_limit
+    if payload.outstanding_balance is not None:
+        customer.outstanding_balance = payload.outstanding_balance
+    if payload.credit_terms is not None:
+        customer.credit_terms = payload.credit_terms.strip() or None
+    if payload.territory_route is not None:
+        customer.territory_route = payload.territory_route.strip() or None
+    if payload.assigned_seller_id is not None:
+        customer.assigned_seller_id = payload.assigned_seller_id
+
+    db.commit()
+    db.refresh(customer)
+    return customer
 
 
 @router.get("/{customer_id}/insights", response_model=CustomerInsightResponse)
@@ -257,6 +322,15 @@ def customer_insights(
     return CustomerInsightResponse(
         customer_id=customer.id,
         external_customer_id=customer.external_customer_id,
+        company_name=customer.company_name,
+        gstin=customer.gstin,
+        contact_phone=customer.contact_phone,
+        contact_email=customer.contact_email,
+        location=customer.location,
+        credit_limit=customer.credit_limit,
+        outstanding_balance=customer.outstanding_balance,
+        credit_terms=customer.credit_terms,
+        territory_route=customer.territory_route,
         assigned_seller_id=customer.assigned_seller_id,
         first_visit=first_visit,
         last_visit=last_visit,

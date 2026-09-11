@@ -39,6 +39,15 @@ class CustomerBehaviorSummary(BaseModel):
 class CustomerSegmentResponse(BaseModel):
     customer_id: UUID
     external_customer_id: str
+    company_name: str | None = None
+    gstin: str | None = None
+    contact_phone: str | None = None
+    contact_email: str | None = None
+    location: str | None = None
+    credit_limit: Decimal | None = None
+    outstanding_balance: Decimal | None = None
+    credit_terms: str | None = None
+    territory_route: str | None = None
     assigned_seller_id: UUID | None
     segment_code: str
     segment_name: str
