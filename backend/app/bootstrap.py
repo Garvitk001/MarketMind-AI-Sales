@@ -1,13 +1,36 @@
-from sqlalchemy import select
+from sqlalchemy import inspect, select, text
 
 from app.core.config import settings
 from app.core.security import hash_password, utcnow
-from app.db.session import SessionLocal
+from app.db.base import Base
+from app.db.session import SessionLocal, engine
+import app.models  # ensure all models are loaded
 from app.models.identity import Role, RoleCode, Tenant, User, UserStatus
 from app.services.identity import normalize_email, seed_authorization
 
 
+def auto_migrate_schema() -> None:
+    """Safely detect and add any missing columns across all tables on startup."""
+    try:
+        inspector = inspect(engine)
+        existing_tables = set(inspector.get_table_names())
+        with engine.begin() as conn:
+            for table_name, table in Base.metadata.tables.items():
+                if table_name not in existing_tables:
+                    continue
+                existing_cols = {col["name"] for col in inspector.get_columns(table_name)}
+                for col in table.columns:
+                    if col.name not in existing_cols:
+                        col_type = col.type.compile(engine.dialect)
+                        alter_query = f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type}"
+                        conn.execute(text(alter_query))
+    except Exception:
+        pass
+
+
 def bootstrap() -> None:
+    Base.metadata.create_all(bind=engine)
+    auto_migrate_schema()
     with SessionLocal() as db:
         seed_authorization(db)
         if not settings.initial_admin_email or not settings.initial_admin_password:
